@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 簡報生成器 · 商務 & 學校報告投影片自動產生</title>
+  <meta name="description" content="輸入主題，由 AI 產出簡報大綱與內容，確認後選擇設計風格，一鍵生成可下載的 PPTX 投影片。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- PPTX 生成 (client-side) -->
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <div>
+        <h1>AI 簡報生成器</h1>
+        <p class="tagline">商務 &amp; 學校報告投影片 · 自動大綱 → 設計 → 下載</p>
+      </div>
+    </div>
+    <button id="settingsBtn" class="ghost-btn" title="API 設定">⚙ API 設定</button>
+  </header>
+
+  <!-- 步驟進度條 -->
+  <nav class="stepper" id="stepper">
+    <div class="step active" data-step="1"><span>1</span>選擇目的</div>
+    <div class="step" data-step="2"><span>2</span>輸入主題</div>
+    <div class="step" data-step="3"><span>3</span>確認大綱</div>
+    <div class="step" data-step="4"><span>4</span>設計風格</div>
+    <div class="step" data-step="5"><span>5</span>生成下載</div>
+  </nav>
+
+  <main class="container">
+
+    <!-- ===== 步驟 1：選擇目的 ===== -->
+    <section class="panel active" id="panel-1">
+      <h2>這份簡報的目的是什麼？</h2>
+      <p class="hint">不同目的會套用不同的簡報架構與用語。選一個最接近的。</p>
+      <div class="card-grid" id="purposeGrid"><!-- JS 填入 --></div>
+      <div class="actions">
+        <span></span>
+        <button class="primary-btn" id="toStep2" disabled>下一步：輸入主題 →</button>
+      </div>
+    </section>
+
+    <!-- ===== 步驟 2：輸入主題 ===== -->
+    <section class="panel" id="panel-2">
+      <h2>告訴 AI 你的主題與方向</h2>
+      <div class="form-grid">
+        <label class="field">
+          <span>簡報主題 <em>*</em></span>
+          <input type="text" id="topicInput" placeholder="例如：2026 馬來西亞市場進入商業計畫" />
+        </label>
+        <label class="field">
+          <span>重點方向 / 想涵蓋的內容（選填）</span>
+          <textarea id="directionInput" rows="4" placeholder="例如：市場規模、競爭分析、財務預估、3 年路線圖、風險與對策。也可貼上你的草稿或要點。"></textarea>
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>目標聽眾</span>
+            <input type="text" id="audienceInput" placeholder="例如：管理層 / 老師同學 / 客戶" />
+          </label>
+          <label class="field">
+            <span>投影片張數</span>
+            <select id="slideCount">
+              <option value="6">精簡（約 6 張）</option>
+              <option value="10" selected>標準（約 10 張）</option>
+              <option value="14">完整（約 14 張）</option>
+              <option value="18">深入（約 18 張）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>語言</span>
+            <select id="langSelect">
+              <option value="繁體中文" selected>繁體中文</option>
+              <option value="English">English</option>
+              <option value="繁體中文（含英文專有名詞）">繁中 + 英文術語</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>語氣風格</span>
+          <select id="toneSelect">
+            <option value="專業正式">專業正式</option>
+            <option value="清楚易懂" selected>清楚易懂</option>
+            <option value="活潑有說服力">活潑有說服力</option>
+            <option value="學術嚴謹">學術嚴謹</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button class="ghost-btn" data-goto="1">← 上一步</button>
+        <button class="primary-btn" id="generateOutlineBtn">✨ 產生大綱與內容</button>
+      </div>
+    </section>
+
+    <!-- ===== 步驟 3：確認大綱 ===== -->
+    <section class="panel" id="panel-3">
+      <h2>確認 / 編輯簡報大綱</h2>
+      <p class="hint">這是 AI 產出的草稿。可直接編輯文字、增刪重點或整張投影片。滿意後再進入設計。</p>
+      <div class="outline-head">
+        <input type="text" id="deckTitle" class="deck-title-input" placeholder="簡報標題" />
+        <input type="text" id="deckSubtitle" class="deck-subtitle-input" placeholder="副標題 / 講者 / 日期" />
+      </div>
+      <div id="slidesEditor" class="slides-editor"><!-- JS 填入 --></div>
+      <div class="outline-tools">
+        <button class="ghost-btn" id="addSlideBtn">＋ 新增一張投影片</button>
+        <button class="ghost-btn" id="regenBtn">↻ 重新生成大綱</button>
+      </div>
+      <div class="actions">
+        <button class="ghost-btn" data-goto="2">← 上一步</button>
+        <button class="primary-btn" id="toStep4">下一步：選擇設計風格 →</button>
+      </div>
+    </section>
+
+    <!-- ===== 步驟 4：設計風格 ===== -->
+    <section class="panel" id="panel-4">
+      <h2>選擇設計風格</h2>
+      <p class="hint">每種風格有不同的配色、字級與版面。下方為即時預覽。</p>
+      <div class="theme-grid" id="themeGrid"><!-- JS 填入 --></div>
+      <div class="actions">
+        <button class="ghost-btn" data-goto="3">← 上一步</button>
+        <button class="primary-btn" id="toStep5">下一步：生成投影片 →</button>
+      </div>
+    </section>
+
+    <!-- ===== 步驟 5：生成下載 ===== -->
+    <section class="panel" id="panel-5">
+      <h2>生成你的簡報</h2>
+      <div class="summary-box" id="summaryBox"><!-- JS 填入 --></div>
+      <div class="generate-zone">
+        <button class="primary-btn big" id="downloadPptxBtn">⬇ 生成並下載 PPTX</button>
+        <p class="hint center">檔案在你的瀏覽器本機產生，不會上傳到任何伺服器。</p>
+      </div>
+      <div class="actions">
+        <button class="ghost-btn" data-goto="4">← 上一步</button>
+        <button class="ghost-btn" data-goto="1">↺ 重新開始</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== API 設定 Modal ===== -->
+  <div class="modal-backdrop" id="settingsModal" hidden>
+    <div class="modal">
+      <h3>AI 模型設定</h3>
+      <p class="hint">本工具部署在 GitHub Pages（純前端），需要你自己的 API 金鑰來呼叫 AI。金鑰只會存在你瀏覽器的 localStorage，<strong>不會上傳</strong>。</p>
+      <label class="field">
+        <span>AI 供應商</span>
+        <select id="providerSelect">
+          <option value="anthropic">Anthropic（Claude）</option>
+          <option value="openai">OpenAI（GPT）</option>
+          <option value="gemini">Google（Gemini）</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>模型名稱</span>
+        <input type="text" id="modelInput" placeholder="claude-opus-4-8" />
+      </label>
+      <label class="field">
+        <span>API 金鑰</span>
+        <input type="password" id="apiKeyInput" placeholder="sk-..." />
+      </label>
+      <p class="hint" id="providerHint"></p>
+      <div class="modal-actions">
+        <button class="ghost-btn" id="closeSettings">取消</button>
+        <button class="primary-btn" id="saveSettings">儲存</button>
+      </div>
+      <details class="no-key">
+        <summary>沒有 API 金鑰？也可以「手動模式」</summary>
+        <p class="hint">不填金鑰時，按「產生大綱」會給你一段可複製的提示詞（prompt）。把它貼到任何 AI 聊天工具，再把回傳的 JSON 貼回大綱欄即可繼續設計與下載。</p>
+      </details>
+    </div>
+  </div>
+
+  <!-- ===== Loading 遮罩 ===== -->
+  <div class="loading-backdrop" id="loadingOverlay" hidden>
+    <div class="spinner"></div>
+    <p id="loadingText">AI 思考中…</p>
+  </div>
+
+  <!-- ===== 手動貼上 JSON Modal ===== -->
+  <div class="modal-backdrop" id="manualModal" hidden>
+    <div class="modal">
+      <h3>手動模式</h3>
+      <p class="hint">1. 複製下方提示詞貼到 AI 聊天工具：</p>
+      <textarea id="manualPrompt" rows="6" readonly class="mono"></textarea>
+      <button class="ghost-btn" id="copyPromptBtn">📋 複製提示詞</button>
+      <p class="hint">2. 把 AI 回傳的 JSON 貼到這裡：</p>
+      <textarea id="manualJson" rows="6" placeholder='{ "title": "...", "slides": [...] }' class="mono"></textarea>
+      <div class="modal-actions">
+        <button class="ghost-btn" id="closeManual">取消</button>
+        <button class="primary-btn" id="applyManual">套用大綱</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>純前端 · 可部署於 GitHub Pages · PPTX 由 <a href="https://gitbrent.github.io/PptxGenJS/" target="_blank" rel="noopener">PptxGenJS</a> 生成</span>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/themes.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

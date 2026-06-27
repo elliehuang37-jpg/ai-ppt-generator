@@ -1,0 +1,18 @@
+# 本機開發工具設定（preview 伺服器等），不需進版控
+.claude/
+
+# OS 產生的檔案
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+
+# 不小心放進來的金鑰檔
+*.key
+.env
+secrets.*

@@ -126,6 +126,35 @@
       <h2>選擇設計風格</h2>
       <p class="hint">每種風格有不同的配色、字級與版面。下方為即時預覽。</p>
       <div class="theme-grid" id="themeGrid"><!-- JS 填入 --></div>
+
+      <!-- 品牌客製：企業主色 + Logo -->
+      <div class="brand-box">
+        <h3>企業品牌客製（選填）</h3>
+        <p class="hint">在所選風格上套用貴公司的主色與 Logo，做出專屬品牌簡報。</p>
+        <div class="brand-row">
+          <div class="brand-field">
+            <span>企業主色</span>
+            <div class="color-line">
+              <input type="color" id="accentPicker" value="#2563EB" />
+              <input type="text" id="accentHex" class="hex-input" placeholder="#2563EB" maxlength="7" />
+              <button class="ghost-btn small" id="applyAccent">套用</button>
+              <button class="ghost-btn small" id="clearAccent">還原</button>
+            </div>
+            <span class="brand-note" id="accentNote">目前使用風格預設色</span>
+          </div>
+          <div class="brand-field">
+            <span>品牌 Logo（PNG / JPG）</span>
+            <div class="color-line">
+              <button class="ghost-btn small" id="logoBtn">上傳 Logo</button>
+              <button class="ghost-btn small" id="clearLogo" hidden>移除</button>
+              <img id="logoPreview" class="logo-preview" hidden alt="logo" />
+              <input type="file" id="logoFile" accept="image/png,image/jpeg,image/svg+xml" hidden />
+            </div>
+            <span class="brand-note">會自動放到封面與各頁頁首（右上）。</span>
+          </div>
+        </div>
+      </div>
+
       <div class="actions">
         <button class="ghost-btn" data-goto="3">← 上一步</button>
         <button class="primary-btn" id="toStep5">下一步：生成投影片 →</button>

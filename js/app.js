@@ -35,8 +35,10 @@ const STORE_KEY = "ppt_workstate";
 const state = {
   purpose: null,
   topic: "", direction: "", audience: "", slideCount: 10, lang: "繁體中文", tone: "清楚易懂",
-  deck: null,          // { title, subtitle, slides:[{title,bullets:[],notes}] }
+  deck: null,          // { title, subtitle, slides:[{title,bullets:[],notes,layout,chartType}] }
   theme: THEMES[0].id,
+  customAccent: null,  // 企業主色（覆蓋風格主色）
+  logo: null,          // { data, w, h } 品牌 Logo（已縮圖的 dataURL）
   step: 1,
   previewIdx: 0
 };
@@ -71,9 +73,16 @@ const LAYOUTS = [
   { id: "bullets", name: "條列重點", hint: "" },
   { id: "section", name: "章節分隔", hint: "此頁作為章節封面：標題即章節名，第一個重點作為簡短說明。" },
   { id: "metrics", name: "數據亮點 (KPI)", hint: "每個重點請用「數值 | 說明」，例如：180% | 三年 ROI。" },
+  { id: "chart", name: "圖表 (長條/圓餅)", hint: "每個重點用「標籤 | 數值」，數值需為數字，例如：北部 | 45。" },
   { id: "quote", name: "金句引言", hint: "第一個重點 = 金句，第二個重點 = 出處/署名。" }
 ];
 const LAYOUT_IDS = LAYOUTS.map(l => l.id);
+const CHART_TYPES = [
+  { id: "bar", name: "長條圖" },
+  { id: "pie", name: "圓餅圖" },
+  { id: "line", name: "折線圖" }
+];
+const CHART_IDS = CHART_TYPES.map(c => c.id);
 
 function hx(c){ return (c || "").replace("#", ""); }
 function _rgb(h){ h = hx(h); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
@@ -95,13 +104,55 @@ function parseMetrics(bullets){
 // 目前簡報的 eyebrow 小標（用簡報目的名稱）
 function kickerText(){ const p = PURPOSES.find(x => x.id === state.purpose); return p ? p.name : ""; }
 
+// 解析圖表資料：每列「標籤 | 數值」，數值取數字（去除 %、逗號、貨幣符號）
+function parseChartData(bullets){
+  const labels = [], values = [];
+  (bullets || []).forEach(b => {
+    const parts = String(b).split(/\s*[|｜:：\t]\s*/);
+    if (parts.length < 2) return;
+    const num = parseFloat(parts[1].replace(/[^0-9.\-]/g, ""));
+    if (!isNaN(num)) { labels.push(parts[0].trim()); values.push(num); }
+  });
+  return { labels, values };
+}
+// 由主色/輔色推導的圖表色盤
+function chartPalette(t, n){
+  const base = [t.accent, t.accent2, lighten(t.accent, 0.28), darken(t.accent, 0.2), lighten(t.accent2, 0.2), mix(t.accent, t.accent2, 0.5)];
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(base[i % base.length]);
+  return out;
+}
+
+// 企業主色：在所選風格上套用自訂主色，重算相關顏色（保留中性底色/文字）
+function customizeTheme(base, hex){
+  const c = hx(hex);
+  const onDarkBg = isDark(base.bg);
+  const coverText = isDark(c) ? "FFFFFF" : "1A1A1A";
+  return Object.assign({}, base, {
+    id: base.id + "-custom",
+    accent: c,
+    accent2: lighten(c, 0.35),
+    bullet: c,
+    title: onDarkBg ? lighten(c, 0.5) : darken(c, 0.12),
+    coverBg: c,
+    coverText: coverText,
+    coverAccent: isDark(c) ? lighten(c, 0.55) : darken(c, 0.28)
+  });
+}
+// 目前實際套用的主題（含自訂主色）
+function activeTheme(){
+  const base = THEMES.find(x => x.id === state.theme) || THEMES[0];
+  return state.customAccent ? customizeTheme(base, state.customAccent) : base;
+}
+
 /* ---------- 自動存檔 / 還原 ---------- */
 let _saveTimer = null;
 function saveState() {
   lsSet(STORE_KEY, JSON.stringify({
     purpose: state.purpose, topic: state.topic, direction: state.direction,
     audience: state.audience, slideCount: state.slideCount, lang: state.lang,
-    tone: state.tone, deck: state.deck, theme: state.theme, step: state.step
+    tone: state.tone, deck: state.deck, theme: state.theme, step: state.step,
+    customAccent: state.customAccent, logo: state.logo
   }));
 }
 function collectAll() {
@@ -121,8 +172,10 @@ function restoreState() {
   Object.assign(state, {
     purpose: saved.purpose || null, topic: saved.topic || "", direction: saved.direction || "",
     audience: saved.audience || "", slideCount: saved.slideCount || 10, lang: saved.lang || "繁體中文",
-    tone: saved.tone || "清楚易懂", deck: saved.deck || null, theme: saved.theme || THEMES[0].id
+    tone: saved.tone || "清楚易懂", deck: saved.deck || null, theme: saved.theme || THEMES[0].id,
+    customAccent: saved.customAccent || null, logo: saved.logo || null
   });
+  applyBrandUI();
   // 回填表單
   $("#topicInput").value = state.topic;
   $("#directionInput").value = state.direction;
@@ -237,9 +290,10 @@ ${state.audience ? `【目標聽眾】${state.audience}` : ""}
 4. 為每張投影片指定 layout（版型），讓簡報更專業、有節奏：
    - "section"：章節分隔頁，放在每個主要段落開始前（標題=章節名，bullets 放 1 句簡短說明）。
    - "metrics"：關鍵數據頁（如財務、KPI、成效）；此時每個 bullet 用「數值 | 說明」格式，例如 "180% | 三年投資報酬率"、"NT$5M | 首年投入"。
+   - "chart"：需要以圖表呈現的量化比較（如各區占比、逐年趨勢）；此時每個 bullet 用「標籤 | 數值」格式，數值必須是純數字，例如 "北部 | 45"、"2024 | 120"。並加上 "chartType"，可為 "bar"（長條）、"pie"（圓餅）、"line"（折線）。
    - "quote"：金句 / 願景 / 客戶見證頁（bullet1 = 金句，bullet2 = 出處或署名）。
    - "bullets"：一般條列重點（預設）。
-   適度穿插 section 與 metrics，讓整份簡報有起承轉合；不要每張都一樣。
+   適度穿插 section、metrics 與 chart，讓整份簡報有起承轉合；不要每張都一樣。
 5. 只回傳 JSON，不要加任何解說文字或 markdown 標記。
 
 JSON 格式（嚴格遵守）：
@@ -247,7 +301,7 @@ JSON 格式（嚴格遵守）：
   "title": "簡報主標題",
   "subtitle": "副標題或一句話定位（可含講者/日期占位）",
   "slides": [
-    { "title": "投影片標題", "layout": "bullets", "bullets": ["重點1", "重點2", "重點3"], "notes": "講稿提示" }
+    { "title": "投影片標題", "layout": "bullets", "chartType": "bar", "bullets": ["重點1", "重點2", "重點3"], "notes": "講稿提示" }
   ]
 }`;
 }
@@ -310,7 +364,8 @@ function parseDeck(raw) {
     title: sl.title || "未命名投影片",
     bullets: Array.isArray(sl.bullets) ? sl.bullets : (sl.content ? [sl.content] : []),
     notes: sl.notes || "",
-    layout: LAYOUT_IDS.includes(sl.layout) ? sl.layout : "bullets"
+    layout: LAYOUT_IDS.includes(sl.layout) ? sl.layout : "bullets",
+    chartType: CHART_IDS.includes(sl.chartType) ? sl.chartType : "bar"
   }));
   return { title: obj.title || state.topic, subtitle: obj.subtitle || "", slides: obj.slides };
 }
@@ -357,7 +412,8 @@ async function regenerateSlide(card) {
       title: obj.title || cur.title,
       bullets: Array.isArray(obj.bullets) ? obj.bullets : cur.bullets,
       notes: obj.notes || cur.notes,
-      layout: cur.layout || "bullets"
+      layout: cur.layout || "bullets",
+      chartType: cur.chartType || "bar"
     };
     state.deck.slides[idx] = nu;
     const fresh = slideCardEl(nu, idx);
@@ -393,6 +449,7 @@ function slideCardEl(sl, i) {
     <div class="sc-layout-row">
       <label>版型</label>
       <select class="sc-layout">${LAYOUTS.map(l => `<option value="${l.id}" ${l.id === (sl.layout || "bullets") ? "selected" : ""}>${l.name}</option>`).join("")}</select>
+      <select class="sc-charttype" hidden>${CHART_TYPES.map(c => `<option value="${c.id}" ${c.id === (sl.chartType || "bar") ? "selected" : ""}>${c.name}</option>`).join("")}</select>
       <span class="sc-hint"></span>
     </div>
     <div class="bullets"></div>
@@ -414,10 +471,15 @@ function slideCardEl(sl, i) {
     if (!ta.hidden) { autoGrow(ta); ta.focus(); }
   });
   const lay = card.querySelector(".sc-layout");
+  const chartSel = card.querySelector(".sc-charttype");
   const hint = card.querySelector(".sc-hint");
-  const updateHint = () => { hint.textContent = (LAYOUTS.find(l => l.id === lay.value) || {}).hint || ""; };
+  const updateHint = () => {
+    hint.textContent = (LAYOUTS.find(l => l.id === lay.value) || {}).hint || "";
+    chartSel.hidden = lay.value !== "chart";
+  };
   updateHint();
   lay.addEventListener("change", () => { updateHint(); saveState(); });
+  chartSel.addEventListener("change", saveState);
   return card;
 }
 function bulletRow(text) {
@@ -448,7 +510,8 @@ function harvestOutline() {
     const bullets = [...card.querySelectorAll(".bullet-row textarea")].map(t => t.value.trim()).filter(Boolean);
     const notes = card.querySelector(".notes-area").value.trim();
     const layout = card.querySelector(".sc-layout").value;
-    slides.push({ title, bullets, notes, layout });
+    const chartType = card.querySelector(".sc-charttype").value;
+    slides.push({ title, bullets, notes, layout, chartType });
   });
   state.deck = {
     title: $("#deckTitle").value.trim() || state.topic,
@@ -461,7 +524,7 @@ function harvestOutline() {
 function buildSummary() {
   harvestOutline();
   const p = PURPOSES.find(x => x.id === state.purpose);
-  const t = THEMES.find(x => x.id === state.theme);
+  const t = activeTheme();
   $("#summaryBox").innerHTML = `
     <div class="row"><span class="k">簡報目的</span><span class="v">${p ? p.name : "—"}</span></div>
     <div class="row"><span class="k">主題</span><span class="v">${escapeHtml(state.deck.title)}</span></div>
@@ -487,9 +550,46 @@ function sectionNumberFor(idx) {
   for (let k = 0; k <= idx; k++) if ((state.deck.slides[k].layout || "bullets") === "section") n++;
   return n;
 }
+function logoImg(cls) {
+  return state.logo && state.logo.data ? `<img class="pv-logo ${cls || ""}" src="${state.logo.data}" alt="logo" />` : "";
+}
+// 預覽用的輕量 SVG 圖表（與 PPTX 圖表對應）
+function pvChartSvg(labels, values, type, t) {
+  const max = Math.max(...values, 1), n = values.length;
+  const col = chartPalette(t, type === "pie" ? n : 1);
+  if (type === "pie") {
+    const total = values.reduce((a, b) => a + b, 0) || 1;
+    let ang = -Math.PI / 2; const cx = 26, cy = 30, r = 23; let paths = "";
+    values.forEach((v, i) => {
+      const a2 = ang + (v / total) * 2 * Math.PI;
+      const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang);
+      const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+      const large = (a2 - ang) > Math.PI ? 1 : 0;
+      paths += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="#${col[i]}" stroke="#${t.bg}" stroke-width="0.6"/>`;
+      ang = a2;
+    });
+    const legend = labels.map((l, i) => `<g transform="translate(58,${12 + i * 7})"><rect width="4" height="4" rx="0.6" fill="#${col[i]}"/><text x="6" y="3.6" font-size="3.3" fill="#${t.text}">${escapeHtml(l)} (${values[i]})</text></g>`).join("");
+    return `<svg viewBox="0 0 100 60" class="pv-svg">${paths}${legend}</svg>`;
+  }
+  const gap = 4, bw = (100 - gap * (n + 1)) / n, base = 52;
+  if (type === "line") {
+    const pts = values.map((v, i) => [gap + i * (bw + gap) + bw / 2, base - (v / max) * 44]);
+    const poly = pts.map(p => p.map(z => z.toFixed(2)).join(",")).join(" ");
+    const dots = pts.map((p, i) => `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="1.2" fill="#${col[0]}"/><text x="${p[0].toFixed(2)}" y="${(p[1] - 2).toFixed(2)}" font-size="3" fill="#${t.text}" text-anchor="middle">${values[i]}</text>`).join("");
+    const cats = labels.map((l, i) => `<text x="${(gap + i * (bw + gap) + bw / 2).toFixed(2)}" y="58" font-size="3" fill="#${t.footer}" text-anchor="middle">${escapeHtml(l)}</text>`).join("");
+    return `<svg viewBox="0 0 100 60" class="pv-svg"><line x1="2" y1="${base}" x2="98" y2="${base}" stroke="#${t.footer}" stroke-width="0.4"/><polyline points="${poly}" fill="none" stroke="#${col[0]}" stroke-width="1"/>${dots}${cats}</svg>`;
+  }
+  const bars = values.map((v, i) => {
+    const h = (v / max) * 44, x = gap + i * (bw + gap), y = base - h;
+    return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${h.toFixed(2)}" rx="0.6" fill="#${col[0]}"/>`
+      + `<text x="${(x + bw / 2).toFixed(2)}" y="${(y - 1.2).toFixed(2)}" font-size="3" fill="#${t.text}" text-anchor="middle">${v}</text>`
+      + `<text x="${(x + bw / 2).toFixed(2)}" y="58" font-size="3" fill="#${t.footer}" text-anchor="middle">${escapeHtml(labels[i])}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 100 60" class="pv-svg"><line x1="2" y1="${base}" x2="98" y2="${base}" stroke="#${t.footer}" stroke-width="0.4"/>${bars}</svg>`;
+}
 function renderPreview() {
   if (!state.deck) return;
-  const t = THEMES.find(x => x.id === state.theme);
+  const t = activeTheme();
   const model = previewModel();
   state.previewIdx = Math.max(0, Math.min(state.previewIdx, model.length - 1));
   const item = model[state.previewIdx];
@@ -501,6 +601,7 @@ function renderPreview() {
       <span style="color:#${t.footer}">${i + 1} / ${state.deck.slides.length}</span></div>`;
   const header = title => `
       <div class="pv-strip" style="background:#${t.accent}"></div>
+      ${logoImg()}
       <div class="pv-kicker" style="color:#${t.accent}">${escapeHtml(kickerText())}</div>
       <div class="pv-title" style="color:#${t.title}">${escapeHtml(title)}</div>
       <div class="pv-underline" style="background:#${t.accent}"></div>`;
@@ -509,6 +610,7 @@ function renderPreview() {
     stage.style.background = "#" + t.coverBg;
     stage.innerHTML = `
       <div class="pv-sidebar" style="background:#${t.coverAccent}"></div>
+      ${logoImg("pv-logo-cover")}
       <div class="pv-cover-kicker" style="color:#${t.coverText}">${escapeHtml(kickerText())}</div>
       <div class="pv-cover-title" style="color:#${t.coverText}">${escapeHtml(state.deck.title)}</div>
       <div class="pv-cover-accent" style="background:#${t.coverAccent}"></div>
@@ -537,6 +639,14 @@ function renderPreview() {
       <div class="pv-sec-title" style="color:#${t.coverText}">${escapeHtml(sl.title)}</div>
       ${sl.bullets[0] ? `<div class="pv-sec-desc" style="color:#${t.coverText}">${escapeHtml(sl.bullets[0])}</div>` : ""}`;
     return;
+  }
+  if (layout === "chart") {
+    const cd = parseChartData(sl.bullets);
+    if (cd.labels.length) {
+      stage.style.background = "#" + t.bg;
+      stage.innerHTML = header(sl.title) + `<div class="pv-chart">${pvChartSvg(cd.labels, cd.values, sl.chartType || "bar", t)}</div>` + foot(item.i);
+      return;
+    }
   }
   if (layout === "metrics") {
     const ms = parseMetrics(sl.bullets);
@@ -588,6 +698,71 @@ function pptxFooter(pptx, s, t, W, H, i, total) {
   s.addText(state.deck.title, { x: 0.98, y: H - 0.56, w: W - 3.4, h: 0.3, fontSize: 9.5, color: t.footer, valign: "middle", fontFace: t.bodyFont });
   s.addText(`${i + 1} / ${total}`, { x: W - 1.6, y: H - 0.56, w: 0.88, h: 0.3, fontSize: 9.5, color: t.footer, align: "right", valign: "middle", fontFace: t.bodyFont });
 }
+function drawLogo(s, W, maxH, y) {
+  if (!state.logo || !state.logo.data) return;
+  const { data, w, h } = state.logo;
+  const hh = maxH, ww = hh * (w / h);
+  try { s.addImage({ data, x: W - 0.72 - ww, y, w: ww, h: hh }); } catch (e) { /* 忽略無效圖檔 */ }
+}
+// 圖表以向量圖形繪製（相容性最佳，不依賴內嵌 Excel 的 addChart）
+function pptxChart(pptx, s, t, W, H, sl, i, total) {
+  pptxHeader(pptx, s, t, W, sl.title);
+  const { labels, values } = parseChartData(sl.bullets);
+  if (!labels.length) { pptxBullets(pptx, s, t, W, H, sl, i, total); return; }
+  const ct = sl.chartType || "bar";
+  const colors = chartPalette(t, labels.length);
+  if (ct === "pie") pptxPie(pptx, s, t, W, H, labels, values, colors);
+  else if (ct === "line") pptxLine(pptx, s, t, W, H, labels, values);
+  else pptxBar(pptx, s, t, W, H, labels, values, colors);
+  pptxFooter(pptx, s, t, W, H, i, total);
+}
+function pptxBar(pptx, s, t, W, H, labels, values, colors) {
+  const x0 = 1.0, plotW = W - 2.0, top = 2.4, baseline = 6.1, plotH = baseline - top;
+  const max = Math.max(...values, 1), n = values.length;
+  const gap = plotW * 0.03, bw = Math.min(1.6, (plotW - gap * (n + 1)) / n);
+  const startX = x0 + (plotW - (bw * n + gap * (n - 1))) / 2;
+  s.addShape(pptx.ShapeType.rect, { x: x0, y: baseline, w: plotW, h: 0.015, fill: { color: t.footer, transparency: 30 } });
+  labels.forEach((l, k) => {
+    const h = Math.max(0.03, values[k] / max * plotH), x = startX + k * (bw + gap), y = baseline - h;
+    s.addShape(pptx.ShapeType.roundRect, { x, y, w: bw, h, fill: { color: colors[k] }, rectRadius: 0.04 });
+    s.addText(String(values[k]), { x: x - 0.3, y: y - 0.36, w: bw + 0.6, h: 0.32, align: "center", fontSize: 12, bold: true, color: t.title, fontFace: t.bodyFont });
+    s.addText(l, { x: x - 0.4, y: baseline + 0.06, w: bw + 0.8, h: 0.4, align: "center", fontSize: 11, color: t.text, fontFace: t.bodyFont });
+  });
+}
+function pptxLine(pptx, s, t, W, H, labels, values) {
+  const x0 = 1.0, plotW = W - 2.0, top = 2.55, baseline = 6.1, plotH = baseline - top;
+  const max = Math.max(...values, 1), n = values.length, slot = plotW / n;
+  const cx = k => x0 + slot * k + slot / 2, cy = v => baseline - v / max * plotH;
+  s.addShape(pptx.ShapeType.rect, { x: x0, y: baseline, w: plotW, h: 0.015, fill: { color: t.footer, transparency: 30 } });
+  for (let k = 0; k < n - 1; k++) {
+    const x1 = cx(k), y1 = cy(values[k]), x2 = cx(k + 1), y2 = cy(values[k + 1]);
+    const len = Math.hypot(x2 - x1, y2 - y1), ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+    s.addShape(pptx.ShapeType.rect, { x: (x1 + x2) / 2 - len / 2, y: (y1 + y2) / 2 - 0.02, w: len, h: 0.04, fill: { color: t.accent }, rotate: ang });
+  }
+  labels.forEach((l, k) => {
+    const x = cx(k), y = cy(values[k]);
+    s.addShape(pptx.ShapeType.ellipse, { x: x - 0.08, y: y - 0.08, w: 0.16, h: 0.16, fill: { color: t.accent } });
+    s.addText(String(values[k]), { x: x - 0.4, y: y - 0.42, w: 0.8, h: 0.3, align: "center", fontSize: 11, bold: true, color: t.title, fontFace: t.bodyFont });
+    s.addText(l, { x: x - slot / 2, y: baseline + 0.06, w: slot, h: 0.4, align: "center", fontSize: 11, color: t.text, fontFace: t.bodyFont });
+  });
+}
+function pptxPie(pptx, s, t, W, H, labels, values, colors) {
+  const total = values.reduce((a, b) => a + b, 0) || 1;
+  const d = 3.7, cx = 1.2, cy = 2.5;
+  let start = 0;
+  values.forEach((v, k) => {
+    const end = start + v / total * 360;
+    s.addShape(pptx.ShapeType.pie, { x: cx, y: cy, w: d, h: d, fill: { color: colors[k] }, line: { color: t.bg, width: 1 }, angleRange: [start, end] });
+    start = end;
+  });
+  const lx = cx + d + 0.7, ly = cy + 0.15;
+  labels.forEach((l, k) => {
+    const yy = ly + k * 0.52;
+    s.addShape(pptx.ShapeType.rect, { x: lx, y: yy, w: 0.26, h: 0.26, fill: { color: colors[k] } });
+    const pct = Math.round(values[k] / total * 100);
+    s.addText(`${l}　${values[k]}（${pct}%）`, { x: lx + 0.4, y: yy - 0.06, w: W - lx - 0.9, h: 0.38, fontSize: 13, color: t.text, valign: "middle", fontFace: t.bodyFont });
+  });
+}
 function pptxCover(pptx, t, W, H) {
   const s = pptx.addSlide();
   s.background = { color: t.coverBg };
@@ -599,6 +774,7 @@ function pptxCover(pptx, t, W, H) {
   s.addShape(pptx.ShapeType.rect, { x: 0.95, y: 4.2, w: 2.2, h: 0.06, fill: { color: t.coverAccent } });
   if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 0.95, y: 4.45, w: W - 3, h: 1.0, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, transparency: 10 });
   s.addText("AI 簡報生成器", { x: 0.95, y: H - 0.7, w: 6, h: 0.35, fontSize: 10.5, color: t.coverText, transparency: 40, fontFace: t.bodyFont });
+  drawLogo(s, W, 0.7, 0.5);
 }
 function pptxSection(pptx, s, t, W, H, sl, no) {
   s.background = { color: t.coverBg };
@@ -653,12 +829,13 @@ function pptxClosing(pptx, t, W, H) {
   s.addText("謝謝聆聽", { x: 0.9, y: 2.6, w: W - 1.8, h: 1.3, fontSize: 48, bold: true, color: t.coverText, fontFace: t.titleFont });
   s.addText("THANK YOU", { x: 0.95, y: 3.95, w: 6, h: 0.5, fontSize: 15, color: t.coverText, transparency: 30, charSpacing: 4, fontFace: t.bodyFont });
   if (state.deck.title) s.addText(state.deck.title, { x: 0.95, y: H - 1.0, w: W - 2, h: 0.5, fontSize: 13, color: t.coverText, transparency: 30, fontFace: t.bodyFont });
+  drawLogo(s, W, 0.6, 0.5);
 }
 
 function generatePptx() {
   harvestOutline();
   if (!state.deck || !state.deck.slides.length) { toast("沒有可生成的內容", true); return; }
-  const t = THEMES.find(x => x.id === state.theme);
+  const t = activeTheme();
   loading(true, "正在生成 PPTX 檔案…");
   try {
     const pptx = new PptxGenJS();
@@ -675,10 +852,13 @@ function generatePptx() {
       const layout = sl.layout || "bullets";
       const s = pptx.addSlide();
       s.background = { color: t.bg };
+      const isCoverLike = layout === "section";
       if (layout === "section") { sectionNo++; pptxSection(pptx, s, t, W, H, sl, sectionNo); }
       else if (layout === "metrics") { const m = parseMetrics(sl.bullets); m.length ? pptxMetrics(pptx, s, t, W, H, sl, m, i, total) : pptxBullets(pptx, s, t, W, H, sl, i, total); }
+      else if (layout === "chart") pptxChart(pptx, s, t, W, H, sl, i, total);
       else if (layout === "quote") pptxQuote(pptx, s, t, W, H, sl, i, total);
       else pptxBullets(pptx, s, t, W, H, sl, i, total);
+      drawLogo(s, W, isCoverLike ? 0.6 : 0.4, isCoverLike ? 0.5 : 0.34);
       if (sl.notes) s.addNotes(sl.notes);
     });
     pptxClosing(pptx, t, W, H);
@@ -750,16 +930,55 @@ function openSettings() {
   $("#settingsModal").hidden = false;
 }
 
+/* ---------- 企業品牌客製（主色 + Logo） ---------- */
+function applyBrandUI() {
+  if (state.customAccent) {
+    const h = "#" + hx(state.customAccent);
+    $("#accentPicker").value = h; $("#accentHex").value = h;
+    $("#accentNote").textContent = "已套用企業主色 " + h;
+  } else {
+    $("#accentNote").textContent = "目前使用風格預設色";
+  }
+  const hasLogo = state.logo && state.logo.data;
+  $("#logoPreview").hidden = !hasLogo;
+  $("#clearLogo").hidden = !hasLogo;
+  if (hasLogo) $("#logoPreview").src = state.logo.data;
+}
+function applyAccentFromInput() {
+  let v = ($("#accentHex").value.trim() || $("#accentPicker").value).replace(/[^#0-9a-fA-F]/g, "");
+  if (!/^#?[0-9a-fA-F]{6}$/.test(v)) { toast("請輸入有效的 6 位色碼，如 #2563EB", true); return; }
+  state.customAccent = hx(v).toUpperCase();
+  applyBrandUI(); saveState(); toast("已套用企業主色，於預覽 / 下載生效");
+}
+function handleLogoFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 260, scale = Math.min(1, max / Math.max(img.width || max, img.height || max));
+      const w = Math.max(1, Math.round((img.width || max) * scale)), h = Math.max(1, Math.round((img.height || max) * scale));
+      let data;
+      try { const cv = document.createElement("canvas"); cv.width = w; cv.height = h; cv.getContext("2d").drawImage(img, 0, 0, w, h); data = cv.toDataURL("image/png"); }
+      catch (e) { data = reader.result; }
+      state.logo = { data, w, h };
+      applyBrandUI(); saveState(); toast("Logo 已上傳");
+    };
+    img.onerror = () => toast("圖片讀取失敗", true);
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 /* ---------- 全部重設 ---------- */
 function resetAll() {
   if (!confirm("確定要清除目前的主題、大綱與進度，重新開始嗎？（API 設定會保留）")) return;
   clearState();
-  Object.assign(state, { purpose: null, topic: "", direction: "", audience: "", slideCount: 10, lang: "繁體中文", tone: "清楚易懂", deck: null, theme: THEMES[0].id, step: 1, previewIdx: 0 });
+  Object.assign(state, { purpose: null, topic: "", direction: "", audience: "", slideCount: 10, lang: "繁體中文", tone: "清楚易懂", deck: null, theme: THEMES[0].id, customAccent: null, logo: null, step: 1, previewIdx: 0 });
   ["topicInput", "directionInput", "audienceInput"].forEach(id => $("#" + id).value = "");
   $("#slideCount").value = "10"; $("#langSelect").value = "繁體中文"; $("#toneSelect").value = "清楚易懂";
   $("#slidesEditor").innerHTML = "";
   $("#toStep2").disabled = true;
-  renderPurposes(); renderThemes();
+  renderPurposes(); renderThemes(); applyBrandUI();
   goStep(1);
   toast("已重設");
 }
@@ -775,7 +994,7 @@ function bindEvents() {
   $("#toStep5").addEventListener("click", () => goStep(5));
   $("#downloadPptxBtn").addEventListener("click", generatePptx);
   $("#addSlideBtn").addEventListener("click", () => {
-    $("#slidesEditor").appendChild(slideCardEl({ title: "新投影片", bullets: ["重點"], notes: "", layout: "bullets" }, $$("#slidesEditor .slide-card").length));
+    $("#slidesEditor").appendChild(slideCardEl({ title: "新投影片", bullets: ["重點"], notes: "", layout: "bullets", chartType: "bar" }, $$("#slidesEditor .slide-card").length));
     renumber(); requestAnimationFrame(growAll); collectAll();
   });
   $("#regenBtn").addEventListener("click", generateOutline);
@@ -790,6 +1009,15 @@ function bindEvents() {
   // 預覽
   $("#prevSlideBtn").addEventListener("click", () => { state.previewIdx--; renderPreview(); });
   $("#nextSlideBtn").addEventListener("click", () => { state.previewIdx++; renderPreview(); });
+
+  // 企業品牌客製
+  $("#applyAccent").addEventListener("click", applyAccentFromInput);
+  $("#accentPicker").addEventListener("input", () => { $("#accentHex").value = $("#accentPicker").value.toUpperCase(); });
+  $("#accentHex").addEventListener("change", () => { const v = $("#accentHex").value.trim(); if (/^#?[0-9a-fA-F]{6}$/.test(v)) $("#accentPicker").value = "#" + hx(v); });
+  $("#clearAccent").addEventListener("click", () => { state.customAccent = null; applyBrandUI(); saveState(); toast("已還原風格預設色"); });
+  $("#logoBtn").addEventListener("click", () => $("#logoFile").click());
+  $("#logoFile").addEventListener("change", e => { if (e.target.files[0]) handleLogoFile(e.target.files[0]); e.target.value = ""; });
+  $("#clearLogo").addEventListener("click", () => { state.logo = null; applyBrandUI(); saveState(); toast("已移除 Logo"); });
 
   // 重設
   $("#resetAllBtn").addEventListener("click", resetAll);

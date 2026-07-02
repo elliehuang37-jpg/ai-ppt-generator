@@ -196,6 +196,26 @@ textarea{resize:vertical}
 .sc-layout-row select{width:auto;padding:6px 10px;font-size:13px}
 .sc-hint{font-size:12px;color:var(--accent);flex:1 1 200px}
 
+/* ---- 預覽：圖表 + Logo ---- */
+.pv-chart{position:absolute;left:6%;right:5%;top:28%;bottom:11%}
+.pv-svg{width:100%;height:100%}
+.pv-logo{position:absolute;top:5%;right:5%;max-height:11%;max-width:26%;object-fit:contain}
+.pv-logo-cover{top:7%;right:6.5%;max-height:15%;max-width:30%}
+
+/* ---- 品牌客製區塊 ---- */
+.brand-box{margin-top:22px;border:1px solid var(--line);background:var(--bg-soft);border-radius:var(--radius);padding:18px}
+.brand-box h3{font-size:16px;margin-bottom:4px}
+.brand-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px}
+.brand-field{display:flex;flex-direction:column;gap:8px}
+.brand-field>span:first-child{font-size:13.5px;font-weight:500}
+.color-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.color-line input[type=color]{width:44px;height:40px;padding:2px;border-radius:10px;background:var(--bg-soft);border:1px solid var(--line);cursor:pointer}
+.hex-input{width:110px;text-transform:uppercase}
+.ghost-btn.small{padding:8px 12px;font-size:13px}
+.brand-note{font-size:12px;color:var(--muted)}
+.logo-preview{max-height:40px;max-width:120px;object-fit:contain;background:#fff;border-radius:8px;padding:4px;border:1px solid var(--line)}
+@media(max-width:680px){.brand-row{grid-template-columns:1fr}}
+
 /* ---- Theme grid ---- */
 .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
 .theme-card{cursor:pointer;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--card);transition:.2s}

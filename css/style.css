@@ -118,15 +118,83 @@ textarea{resize:vertical}
   color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;
 }
 .slide-card .sc-title{font-size:16px;font-weight:700;flex:1}
-.slide-card .sc-del{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px}
-.slide-card .sc-del:hover{color:#ff7b7b}
+.slide-card .sc-ctrls{display:flex;gap:2px;flex:0 0 auto}
+.slide-card .sc-ctrls button{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;line-height:1}
+.slide-card .sc-ctrls button:hover{background:var(--bg-soft);color:var(--text)}
+.slide-card .sc-ctrls .sc-del:hover{color:#ff7b7b}
+.slide-card .sc-ctrls .sc-regen:hover{color:var(--accent)}
+/* 講稿備註 */
+.sc-notes{margin-top:10px}
+.notes-toggle{font-size:12.5px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;padding:2px 0}
+.notes-toggle:hover{color:var(--accent)}
+.notes-area{margin-top:6px;font-size:13px;background:var(--bg-soft);min-height:52px}
 .slide-card .bullets{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .bullet-row{display:flex;gap:8px;align-items:flex-start}
 .bullet-row .dot{color:var(--accent);margin-top:11px;font-size:10px}
 .bullet-row textarea{min-height:42px;line-height:1.5;overflow:hidden}
 .bullet-row .b-del{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:6px}
 .add-bullet{font-size:13px;color:var(--accent);background:none;border:none;cursor:pointer;margin-top:6px;font-family:inherit}
-.outline-tools{display:flex;gap:12px;margin-top:18px;flex-wrap:wrap}
+.outline-tools{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;align-items:center}
+.tool-sep{flex:1 1 12px}
+
+/* ---- 即時投影片預覽 ---- */
+.preview-wrap{margin:8px 0 22px}
+.preview-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-bottom:8px}
+.preview-counter{font-variant-numeric:tabular-nums}
+.preview-stage{
+  width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;
+  border:1px solid var(--line);box-shadow:var(--shadow);position:relative;
+}
+.preview-nav{display:flex;justify-content:center;gap:12px;margin-top:12px}
+/* 投影片內部（以百分比排版，隨舞台縮放） */
+.pv{position:absolute;inset:0;font-family:"Noto Sans TC",sans-serif}
+.pv-strip{position:absolute;top:0;left:0;right:0;height:2.1%}
+.pv-title{position:absolute;left:5.2%;top:7%;right:5.2%;font-weight:900;font-size:clamp(15px,3.4vw,30px);line-height:1.2}
+.pv-underline{position:absolute;left:5.4%;top:23%;width:12%;height:1.1%;border-radius:3px}
+.pv-body{position:absolute;left:6.4%;right:5.2%;top:27%;bottom:9%;display:flex;gap:4%}
+.pv-col{flex:1;display:flex;flex-direction:column;gap:2.4%}
+.pv-bullet{display:flex;gap:8px;font-size:clamp(11px,2.1vw,18px);line-height:1.3}
+.pv-bullet .pv-dot{flex:0 0 auto;margin-top:.45em;width:.42em;height:.42em;border-radius:50%}
+.pv-foot{position:absolute;left:5.2%;right:5.2%;bottom:3%;display:flex;justify-content:space-between;font-size:clamp(8px,1.4vw,11px)}
+/* 封面 */
+.pv-cover-bar{position:absolute;left:0;right:0;bottom:0;height:12%}
+.pv-cover-accent{position:absolute;left:6.8%;top:38%;width:15%;height:2.2%;border-radius:3px}
+.pv-cover-title{position:absolute;left:6.8%;top:42%;right:8%;font-weight:900;font-size:clamp(18px,4.6vw,44px);line-height:1.15}
+.pv-cover-sub{position:absolute;left:6.8%;top:63%;right:10%;font-size:clamp(11px,2.3vw,20px);opacity:.92}
+/* 結尾 */
+.pv-end-title{position:absolute;inset:0;display:grid;place-items:center;font-weight:900;font-size:clamp(20px,5vw,48px)}
+/* eyebrow / 側欄 / 內容軌 */
+.pv-sidebar{position:absolute;left:0;top:0;bottom:0;width:2.3%}
+.pv-kicker{position:absolute;left:5.4%;top:5%;font-size:clamp(8px,1.5vw,12px);font-weight:700;letter-spacing:.12em}
+.pv-title{top:8.5%}
+.pv-underline{top:24%}
+.pv-rail{position:absolute;left:5.4%;top:29%;bottom:11%;width:1.1%;border-radius:3px;opacity:.9}
+.pv-body-rail{left:9%}
+.pv-cover-kicker{position:absolute;left:6.8%;top:24%;font-size:clamp(9px,1.9vw,15px);font-weight:700;letter-spacing:.16em;opacity:.9}
+.pv-cover-title{top:32%}
+.pv-cover-accent{top:57%}
+.pv-cover-sub{top:62%}
+/* 章節分隔 */
+.pv-sec-no{position:absolute;left:4%;top:2%;font-size:clamp(64px,20vw,190px);font-weight:900;line-height:1;opacity:.28}
+.pv-sec-bar{position:absolute;left:6.8%;top:56%;width:14%;height:1.6%;border-radius:3px}
+.pv-sec-title{position:absolute;left:6.8%;top:60%;right:8%;font-weight:900;font-size:clamp(18px,4.4vw,42px)}
+.pv-sec-desc{position:absolute;left:6.9%;top:80%;right:10%;font-size:clamp(10px,2vw,17px);opacity:.9}
+/* KPI 卡 */
+.pv-cards{position:absolute;left:5.4%;right:5.4%;top:34%;bottom:12%;display:flex;gap:3%}
+.pv-card{flex:1;border:1px solid;border-radius:10px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4% 2%;gap:6%}
+.pv-card-tick{position:absolute;top:14%;left:calc(50% - 6%);width:12%;height:4%;border-radius:2px}
+.pv-card-val{font-weight:900;font-size:clamp(20px,5.2vw,46px);line-height:1}
+.pv-card-lbl{font-size:clamp(9px,1.8vw,15px);text-align:center;line-height:1.25}
+/* 金句 */
+.pv-quote-mark{position:absolute;left:4.5%;top:-4%;font-size:clamp(80px,22vw,210px);font-weight:900;line-height:1;opacity:.24;font-family:Georgia,serif}
+.pv-quote-text{position:absolute;left:11%;right:8%;top:30%;font-weight:800;font-style:italic;font-size:clamp(15px,3.6vw,32px);line-height:1.3}
+.pv-quote-attr{position:absolute;left:12%;top:70%;font-size:clamp(10px,2vw,17px);font-weight:600}
+
+/* ---- 大綱：版型選擇列 ---- */
+.sc-layout-row{display:flex;align-items:center;gap:10px;margin:2px 0 10px;flex-wrap:wrap}
+.sc-layout-row label{font-size:12.5px;color:var(--muted)}
+.sc-layout-row select{width:auto;padding:6px 10px;font-size:13px}
+.sc-hint{font-size:12px;color:var(--accent);flex:1 1 200px}
 
 /* ---- Theme grid ---- */
 .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}

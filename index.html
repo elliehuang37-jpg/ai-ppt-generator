@@ -109,6 +109,11 @@
       <div class="outline-tools">
         <button class="ghost-btn" id="addSlideBtn">＋ 新增一張投影片</button>
         <button class="ghost-btn" id="regenBtn">↻ 重新生成大綱</button>
+        <span class="tool-sep"></span>
+        <button class="ghost-btn" id="exportJsonBtn">⬇ 匯出 JSON</button>
+        <button class="ghost-btn" id="importJsonBtn">⬆ 匯入 JSON</button>
+        <button class="ghost-btn" id="copyMdBtn">📋 複製 Markdown</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden />
       </div>
       <div class="actions">
         <button class="ghost-btn" data-goto="2">← 上一步</button>
@@ -131,13 +136,27 @@
     <section class="panel" id="panel-5">
       <h2>生成你的簡報</h2>
       <div class="summary-box" id="summaryBox"><!-- JS 填入 --></div>
+
+      <!-- 即時投影片預覽 -->
+      <div class="preview-wrap">
+        <div class="preview-head">
+          <span>即時預覽（套用所選風格）</span>
+          <span class="preview-counter" id="previewCounter">1 / 1</span>
+        </div>
+        <div class="preview-stage" id="previewStage"><!-- JS 渲染單張投影片 --></div>
+        <div class="preview-nav">
+          <button class="ghost-btn" id="prevSlideBtn">← 上一張</button>
+          <button class="ghost-btn" id="nextSlideBtn">下一張 →</button>
+        </div>
+      </div>
+
       <div class="generate-zone">
         <button class="primary-btn big" id="downloadPptxBtn">⬇ 生成並下載 PPTX</button>
         <p class="hint center">檔案在你的瀏覽器本機產生，不會上傳到任何伺服器。</p>
       </div>
       <div class="actions">
         <button class="ghost-btn" data-goto="4">← 上一步</button>
-        <button class="ghost-btn" data-goto="1">↺ 重新開始</button>
+        <button class="ghost-btn" id="resetAllBtn">↺ 清除並重新開始</button>
       </div>
     </section>
   </main>
@@ -157,7 +176,8 @@
       </label>
       <label class="field">
         <span>模型名稱</span>
-        <input type="text" id="modelInput" placeholder="claude-opus-4-8" />
+        <input type="text" id="modelInput" list="modelPresets" placeholder="claude-opus-4-8" />
+        <datalist id="modelPresets"></datalist>
       </label>
       <label class="field">
         <span>API 金鑰</span>

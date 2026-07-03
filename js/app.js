@@ -39,9 +39,15 @@ const state = {
   theme: THEMES[0].id,
   customAccent: null,  // 企業主色（覆蓋風格主色）
   logo: null,          // { data, w, h } 品牌 Logo（已縮圖的 dataURL）
+  coverStyle: "left",  // 封面版式：left | center | full
   step: 1,
   previewIdx: 0
 };
+const COVER_STYLES = [
+  { id: "left", name: "左置經典" },
+  { id: "center", name: "置中對稱" },
+  { id: "full", name: "滿版橫幅" }
+];
 
 /* ---------- 工具 ---------- */
 const $ = (sel) => document.querySelector(sel);
@@ -73,7 +79,7 @@ const LAYOUTS = [
   { id: "bullets", name: "條列重點", hint: "" },
   { id: "section", name: "章節分隔", hint: "此頁作為章節封面：標題即章節名，第一個重點作為簡短說明。" },
   { id: "metrics", name: "數據亮點 (KPI)", hint: "每個重點請用「數值 | 說明」，例如：180% | 三年 ROI。" },
-  { id: "chart", name: "圖表 (長條/圓餅)", hint: "每個重點用「標籤 | 數值」，數值需為數字，例如：北部 | 45。" },
+  { id: "chart", name: "圖表 (長條/圓餅)", hint: "每列「標籤 | 數值」；多系列用「標籤 | 值1 | 值2」，並可加一列「#系列 | 名稱1 | 名稱2」定義圖例。" },
   { id: "quote", name: "金句引言", hint: "第一個重點 = 金句，第二個重點 = 出處/署名。" }
 ];
 const LAYOUT_IDS = LAYOUTS.map(l => l.id);
@@ -104,23 +110,44 @@ function parseMetrics(bullets){
 // 目前簡報的 eyebrow 小標（用簡報目的名稱）
 function kickerText(){ const p = PURPOSES.find(x => x.id === state.purpose); return p ? p.name : ""; }
 
-// 解析圖表資料：每列「標籤 | 數值」，數值取數字（去除 %、逗號、貨幣符號）
-function parseChartData(bullets){
-  const labels = [], values = [];
-  (bullets || []).forEach(b => {
-    const parts = String(b).split(/\s*[|｜:：\t]\s*/);
-    if (parts.length < 2) return;
-    const num = parseFloat(parts[1].replace(/[^0-9.\-]/g, ""));
-    if (!isNaN(num)) { labels.push(parts[0].trim()); values.push(num); }
-  });
-  return { labels, values };
-}
 // 由主色/輔色推導的圖表色盤
 function chartPalette(t, n){
   const base = [t.accent, t.accent2, lighten(t.accent, 0.28), darken(t.accent, 0.2), lighten(t.accent2, 0.2), mix(t.accent, t.accent2, 0.5)];
   const out = [];
   for (let i = 0; i < n; i++) out.push(base[i % base.length]);
   return out;
+}
+// 座標軸「漂亮」上限（1/2/5 ×10^n）
+function niceMax(v){
+  if (v <= 0) return 1;
+  const exp = Math.floor(Math.log10(v)), f = v / Math.pow(10, exp);
+  const nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return nf * Math.pow(10, exp);
+}
+// 解析圖表資料（支援多系列）：
+//  一般列「標籤 | 值1 | 值2 …」；系列名稱列以 # / 系列 / 圖例 開頭「#系列 | 名稱1 | 名稱2」
+function parseChartSeries(bullets){
+  const SEP = /\s*[|｜\t]\s*/;
+  let seriesNames = null;
+  const labels = [], rows = [];
+  (bullets || []).forEach(b => {
+    const parts = String(b).trim().split(SEP);
+    if (parts.length < 2) return;
+    const head = parts[0].trim(), rest = parts.slice(1).map(s => s.trim());
+    if (/^(#|系列|圖例|legend)/i.test(head)) { seriesNames = rest; return; }
+    const nums = rest.map(s => parseFloat(s.replace(/[^0-9.\-]/g, "")));
+    const clean = nums.filter(x => !isNaN(x));
+    if (!clean.length) return;
+    labels.push(head);
+    rows.push(nums.map(x => isNaN(x) ? 0 : x));
+  });
+  if (!labels.length) return null;
+  const cols = Math.max(...rows.map(r => r.length));
+  const series = [];
+  for (let c = 0; c < cols; c++) {
+    series.push({ name: (seriesNames && seriesNames[c]) || (cols > 1 ? `系列${c + 1}` : ""), values: labels.map((_, i) => rows[i][c] ?? 0) });
+  }
+  return { labels, series };
 }
 
 // 企業主色：在所選風格上套用自訂主色，重算相關顏色（保留中性底色/文字）
@@ -152,7 +179,7 @@ function saveState() {
     purpose: state.purpose, topic: state.topic, direction: state.direction,
     audience: state.audience, slideCount: state.slideCount, lang: state.lang,
     tone: state.tone, deck: state.deck, theme: state.theme, step: state.step,
-    customAccent: state.customAccent, logo: state.logo
+    customAccent: state.customAccent, logo: state.logo, coverStyle: state.coverStyle
   }));
 }
 function collectAll() {
@@ -173,7 +200,7 @@ function restoreState() {
     purpose: saved.purpose || null, topic: saved.topic || "", direction: saved.direction || "",
     audience: saved.audience || "", slideCount: saved.slideCount || 10, lang: saved.lang || "繁體中文",
     tone: saved.tone || "清楚易懂", deck: saved.deck || null, theme: saved.theme || THEMES[0].id,
-    customAccent: saved.customAccent || null, logo: saved.logo || null
+    customAccent: saved.customAccent || null, logo: saved.logo || null, coverStyle: saved.coverStyle || "left"
   });
   applyBrandUI();
   // 回填表單
@@ -290,7 +317,7 @@ ${state.audience ? `【目標聽眾】${state.audience}` : ""}
 4. 為每張投影片指定 layout（版型），讓簡報更專業、有節奏：
    - "section"：章節分隔頁，放在每個主要段落開始前（標題=章節名，bullets 放 1 句簡短說明）。
    - "metrics"：關鍵數據頁（如財務、KPI、成效）；此時每個 bullet 用「數值 | 說明」格式，例如 "180% | 三年投資報酬率"、"NT$5M | 首年投入"。
-   - "chart"：需要以圖表呈現的量化比較（如各區占比、逐年趨勢）；此時每個 bullet 用「標籤 | 數值」格式，數值必須是純數字，例如 "北部 | 45"、"2024 | 120"。並加上 "chartType"，可為 "bar"（長條）、"pie"（圓餅）、"line"（折線）。
+   - "chart"：需要以圖表呈現的量化比較（如各區占比、逐年趨勢）；此時每個 bullet 用「標籤 | 數值」格式，數值必須是純數字，例如 "北部 | 45"、"2024 | 120"。並加上 "chartType"，可為 "bar"（長條）、"pie"（圓餅）、"line"（折線）。若要比較多組數列（如「實際 vs 目標」），用「標籤 | 值1 | 值2」，並在第一個 bullet 放「#系列 | 名稱1 | 名稱2」定義圖例名稱（圓餅圖僅取第一組）。
    - "quote"：金句 / 願景 / 客戶見證頁（bullet1 = 金句，bullet2 = 出處或署名）。
    - "bullets"：一般條列重點（預設）。
    適度穿插 section、metrics 與 chart，讓整份簡報有起承轉合；不要每張都一樣。
@@ -553,11 +580,20 @@ function sectionNumberFor(idx) {
 function logoImg(cls) {
   return state.logo && state.logo.data ? `<img class="pv-logo ${cls || ""}" src="${state.logo.data}" alt="logo" />` : "";
 }
-// 預覽用的輕量 SVG 圖表（與 PPTX 圖表對應）
-function pvChartSvg(labels, values, type, t) {
-  const max = Math.max(...values, 1), n = values.length;
-  const col = chartPalette(t, type === "pie" ? n : 1);
+// 圖例（SVG）
+function pvLegendSvg(series, col, t, x0) {
+  if (series.length < 2 || !series[0].name) return "";
+  let x = x0;
+  return series.map((sr, i) => {
+    const g = `<rect x="${x.toFixed(1)}" y="0.6" width="2.4" height="2.4" rx="0.3" fill="#${col[i]}"/><text x="${(x + 3.2).toFixed(1)}" y="2.7" font-size="2.7" fill="#${t.text}">${escapeHtml(sr.name)}</text>`;
+    x += 6 + sr.name.length * 1.7;
+    return g;
+  }).join("");
+}
+// 預覽用的輕量 SVG 圖表（多系列 + 座標軸，與 PPTX 對應）
+function pvChartSvg(labels, series, type, t) {
   if (type === "pie") {
+    const values = series[0].values, col = chartPalette(t, labels.length);
     const total = values.reduce((a, b) => a + b, 0) || 1;
     let ang = -Math.PI / 2; const cx = 26, cy = 30, r = 23; let paths = "";
     values.forEach((v, i) => {
@@ -568,24 +604,41 @@ function pvChartSvg(labels, values, type, t) {
       paths += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="#${col[i]}" stroke="#${t.bg}" stroke-width="0.6"/>`;
       ang = a2;
     });
-    const legend = labels.map((l, i) => `<g transform="translate(58,${12 + i * 7})"><rect width="4" height="4" rx="0.6" fill="#${col[i]}"/><text x="6" y="3.6" font-size="3.3" fill="#${t.text}">${escapeHtml(l)} (${values[i]})</text></g>`).join("");
+    const legend = labels.map((l, i) => `<g transform="translate(58,${12 + i * 7})"><rect width="4" height="4" rx="0.6" fill="#${col[i]}"/><text x="6" y="3.6" font-size="3.3" fill="#${t.text}">${escapeHtml(l)} (${Math.round(values[i] / total * 100)}%)</text></g>`).join("");
     return `<svg viewBox="0 0 100 60" class="pv-svg">${paths}${legend}</svg>`;
   }
-  const gap = 4, bw = (100 - gap * (n + 1)) / n, base = 52;
-  if (type === "line") {
-    const pts = values.map((v, i) => [gap + i * (bw + gap) + bw / 2, base - (v / max) * 44]);
-    const poly = pts.map(p => p.map(z => z.toFixed(2)).join(",")).join(" ");
-    const dots = pts.map((p, i) => `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="1.2" fill="#${col[0]}"/><text x="${p[0].toFixed(2)}" y="${(p[1] - 2).toFixed(2)}" font-size="3" fill="#${t.text}" text-anchor="middle">${values[i]}</text>`).join("");
-    const cats = labels.map((l, i) => `<text x="${(gap + i * (bw + gap) + bw / 2).toFixed(2)}" y="58" font-size="3" fill="#${t.footer}" text-anchor="middle">${escapeHtml(l)}</text>`).join("");
-    return `<svg viewBox="0 0 100 60" class="pv-svg"><line x1="2" y1="${base}" x2="98" y2="${base}" stroke="#${t.footer}" stroke-width="0.4"/><polyline points="${poly}" fill="none" stroke="#${col[0]}" stroke-width="1"/>${dots}${cats}</svg>`;
+  const col = chartPalette(t, Math.max(series.length, 1));
+  const L = 10, R = 2, T = 4, B = 8, vw = 100, vh = 62, pw = vw - L - R, ph = vh - T - B, base = T + ph;
+  const max = niceMax(Math.max(...series.flatMap(s => s.values), 1)), ticks = 4;
+  let grid = "";
+  for (let k = 0; k <= ticks; k++) {
+    const y = base - ph * k / ticks;
+    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${L + pw}" y2="${y.toFixed(1)}" stroke="#${t.footer}" stroke-width="${k === 0 ? 0.4 : 0.2}" opacity="${k === 0 ? 0.65 : 0.35}"/>`;
+    grid += `<text x="${L - 1}" y="${(y + 1).toFixed(1)}" font-size="2.6" fill="#${t.footer}" text-anchor="end">${Math.round(max * k / ticks)}</text>`;
   }
-  const bars = values.map((v, i) => {
-    const h = (v / max) * 44, x = gap + i * (bw + gap), y = base - h;
-    return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${h.toFixed(2)}" rx="0.6" fill="#${col[0]}"/>`
-      + `<text x="${(x + bw / 2).toFixed(2)}" y="${(y - 1.2).toFixed(2)}" font-size="3" fill="#${t.text}" text-anchor="middle">${v}</text>`
-      + `<text x="${(x + bw / 2).toFixed(2)}" y="58" font-size="3" fill="#${t.footer}" text-anchor="middle">${escapeHtml(labels[i])}</text>`;
-  }).join("");
-  return `<svg viewBox="0 0 100 60" class="pv-svg"><line x1="2" y1="${base}" x2="98" y2="${base}" stroke="#${t.footer}" stroke-width="0.4"/>${bars}</svg>`;
+  const n = labels.length, slot = pw / n;
+  const cats = labels.map((l, k) => `<text x="${(L + slot * (k + 0.5)).toFixed(1)}" y="${base + 4}" font-size="2.7" fill="#${t.footer}" text-anchor="middle">${escapeHtml(l)}</text>`).join("");
+  const legend = pvLegendSvg(series, col, t, L);
+  if (type === "line") {
+    let body = "";
+    series.forEach((sr, si) => {
+      const pts = sr.values.map((v, k) => [L + slot * (k + 0.5), base - v / max * ph]);
+      body += `<polyline points="${pts.map(p => p.map(z => z.toFixed(1)).join(",")).join(" ")}" fill="none" stroke="#${col[si]}" stroke-width="1"/>`;
+      body += pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="1" fill="#${col[si]}"/>`).join("");
+    });
+    return `<svg viewBox="0 0 100 62" class="pv-svg">${grid}${body}${cats}${legend}</svg>`;
+  }
+  const nSer = series.length, gGap = slot * 0.16, gW = slot - gGap, bw = gW / nSer;
+  let bars = "";
+  labels.forEach((l, ci) => {
+    const gx = L + slot * ci + gGap / 2;
+    series.forEach((sr, si) => {
+      const v = sr.values[ci], h = v / max * ph, x = gx + si * bw, y = base - h;
+      bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(bw * 0.86).toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" rx="0.4" fill="#${col[si]}"/>`;
+      if (nSer <= 2) bars += `<text x="${(x + bw * 0.43).toFixed(1)}" y="${(y - 1).toFixed(1)}" font-size="2.5" fill="#${t.text}" text-anchor="middle">${v}</text>`;
+    });
+  });
+  return `<svg viewBox="0 0 100 62" class="pv-svg">${grid}${bars}${cats}${legend}</svg>`;
 }
 function renderPreview() {
   if (!state.deck) return;
@@ -608,13 +661,32 @@ function renderPreview() {
 
   if (item.type === "cover") {
     stage.style.background = "#" + t.coverBg;
-    stage.innerHTML = `
-      <div class="pv-sidebar" style="background:#${t.coverAccent}"></div>
-      ${logoImg("pv-logo-cover")}
-      <div class="pv-cover-kicker" style="color:#${t.coverText}">${escapeHtml(kickerText())}</div>
-      <div class="pv-cover-title" style="color:#${t.coverText}">${escapeHtml(state.deck.title)}</div>
-      <div class="pv-cover-accent" style="background:#${t.coverAccent}"></div>
-      <div class="pv-cover-sub" style="color:#${t.coverText}">${escapeHtml(state.deck.subtitle)}</div>`;
+    const cs = state.coverStyle || "left";
+    if (cs === "center") {
+      stage.innerHTML = `
+        <div class="pv-cband pv-cband-top" style="background:#${t.coverAccent}"></div>
+        <div class="pv-cband pv-cband-bot" style="background:#${t.coverAccent}"></div>
+        ${logoImg("pv-logo-cover")}
+        <div class="pv-cvC-kicker" style="color:#${t.coverText}">${escapeHtml(kickerText())}</div>
+        <div class="pv-cvC-title" style="color:#${t.coverText}">${escapeHtml(state.deck.title)}</div>
+        <div class="pv-cvC-rule" style="background:#${t.coverAccent}"></div>
+        <div class="pv-cvC-sub" style="color:#${t.coverText}">${escapeHtml(state.deck.subtitle)}</div>`;
+    } else if (cs === "full") {
+      const bandText = isDark(t.coverAccent) ? "FFFFFF" : "1A1A1A";
+      stage.innerHTML = `
+        ${logoImg("pv-logo-cover")}
+        <div class="pv-cvF-kicker" style="color:#${t.coverAccent}">${escapeHtml(kickerText())}</div>
+        <div class="pv-cvF-band" style="background:#${t.coverAccent}"><span class="pv-cvF-title" style="color:#${bandText}">${escapeHtml(state.deck.title)}</span></div>
+        <div class="pv-cvF-sub" style="color:#${t.coverText}">${escapeHtml(state.deck.subtitle)}</div>`;
+    } else {
+      stage.innerHTML = `
+        <div class="pv-sidebar" style="background:#${t.coverAccent}"></div>
+        ${logoImg("pv-logo-cover")}
+        <div class="pv-cover-kicker" style="color:#${t.coverText}">${escapeHtml(kickerText())}</div>
+        <div class="pv-cover-title" style="color:#${t.coverText}">${escapeHtml(state.deck.title)}</div>
+        <div class="pv-cover-accent" style="background:#${t.coverAccent}"></div>
+        <div class="pv-cover-sub" style="color:#${t.coverText}">${escapeHtml(state.deck.subtitle)}</div>`;
+    }
     return;
   }
   if (item.type === "closing") {
@@ -641,10 +713,10 @@ function renderPreview() {
     return;
   }
   if (layout === "chart") {
-    const cd = parseChartData(sl.bullets);
-    if (cd.labels.length) {
+    const cd = parseChartSeries(sl.bullets);
+    if (cd) {
       stage.style.background = "#" + t.bg;
-      stage.innerHTML = header(sl.title) + `<div class="pv-chart">${pvChartSvg(cd.labels, cd.values, sl.chartType || "bar", t)}</div>` + foot(item.i);
+      stage.innerHTML = header(sl.title) + `<div class="pv-chart">${pvChartSvg(cd.labels, cd.series, sl.chartType || "bar", t)}</div>` + foot(item.i);
       return;
     }
   }
@@ -707,44 +779,76 @@ function drawLogo(s, W, maxH, y) {
 // 圖表以向量圖形繪製（相容性最佳，不依賴內嵌 Excel 的 addChart）
 function pptxChart(pptx, s, t, W, H, sl, i, total) {
   pptxHeader(pptx, s, t, W, sl.title);
-  const { labels, values } = parseChartData(sl.bullets);
-  if (!labels.length) { pptxBullets(pptx, s, t, W, H, sl, i, total); return; }
+  const parsed = parseChartSeries(sl.bullets);
+  if (!parsed) { pptxBullets(pptx, s, t, W, H, sl, i, total); return; }
+  const { labels, series } = parsed;
   const ct = sl.chartType || "bar";
-  const colors = chartPalette(t, labels.length);
-  if (ct === "pie") pptxPie(pptx, s, t, W, H, labels, values, colors);
-  else if (ct === "line") pptxLine(pptx, s, t, W, H, labels, values);
-  else pptxBar(pptx, s, t, W, H, labels, values, colors);
+  if (ct === "pie") pptxPie(pptx, s, t, W, H, labels, series[0].values, chartPalette(t, labels.length));
+  else {
+    const colors = chartPalette(t, Math.max(series.length, 1));
+    (ct === "line" ? pptxLine : pptxBar)(pptx, s, t, W, H, labels, series, colors);
+  }
   pptxFooter(pptx, s, t, W, H, i, total);
 }
-function pptxBar(pptx, s, t, W, H, labels, values, colors) {
-  const x0 = 1.0, plotW = W - 2.0, top = 2.4, baseline = 6.1, plotH = baseline - top;
-  const max = Math.max(...values, 1), n = values.length;
-  const gap = plotW * 0.03, bw = Math.min(1.6, (plotW - gap * (n + 1)) / n);
-  const startX = x0 + (plotW - (bw * n + gap * (n - 1))) / 2;
-  s.addShape(pptx.ShapeType.rect, { x: x0, y: baseline, w: plotW, h: 0.015, fill: { color: t.footer, transparency: 30 } });
-  labels.forEach((l, k) => {
-    const h = Math.max(0.03, values[k] / max * plotH), x = startX + k * (bw + gap), y = baseline - h;
-    s.addShape(pptx.ShapeType.roundRect, { x, y, w: bw, h, fill: { color: colors[k] }, rectRadius: 0.04 });
-    s.addText(String(values[k]), { x: x - 0.3, y: y - 0.36, w: bw + 0.6, h: 0.32, align: "center", fontSize: 12, bold: true, color: t.title, fontFace: t.bodyFont });
-    s.addText(l, { x: x - 0.4, y: baseline + 0.06, w: bw + 0.8, h: 0.4, align: "center", fontSize: 11, color: t.text, fontFace: t.bodyFont });
+// Y 軸刻度 + 水平格線
+function pptxAxis(pptx, s, t, x0, top, baseline, plotW, max) {
+  const ticks = 4;
+  for (let k = 0; k <= ticks; k++) {
+    const y = baseline - (baseline - top) * k / ticks;
+    s.addShape(pptx.ShapeType.rect, { x: x0, y, w: plotW, h: k === 0 ? 0.014 : 0.008, fill: { color: t.footer, transparency: k === 0 ? 25 : 68 } });
+    s.addText(String(Math.round(max * k / ticks)), { x: x0 - 1.0, y: y - 0.15, w: 0.85, h: 0.3, align: "right", valign: "middle", fontSize: 9, color: t.footer, fontFace: t.bodyFont });
+  }
+}
+// 圖例（多系列）
+function pptxLegend(pptx, s, t, series, colors, W) {
+  if (series.length < 2 || !series[0].name) return;
+  let cx = W - 0.72;
+  for (let i = series.length - 1; i >= 0; i--) {
+    const label = series[i].name, wText = Math.min(2.4, 0.16 * label.length + 0.45);
+    cx -= wText;
+    s.addText(label, { x: cx + 0.3, y: 1.9, w: wText - 0.3, h: 0.3, fontSize: 11, color: t.text, valign: "middle", fontFace: t.bodyFont });
+    s.addShape(pptx.ShapeType.rect, { x: cx, y: 1.96, w: 0.2, h: 0.2, fill: { color: colors[i] } });
+    cx -= 0.2;
+  }
+}
+function pptxBar(pptx, s, t, W, H, labels, series, colors) {
+  const x0 = 1.3, plotW = W - 2.3, top = 2.5, baseline = 6.1, plotH = baseline - top;
+  const max = niceMax(Math.max(...series.flatMap(sr => sr.values), 1));
+  pptxAxis(pptx, s, t, x0, top, baseline, plotW, max);
+  pptxLegend(pptx, s, t, series, colors, W);
+  const nCat = labels.length, nSer = series.length;
+  const gGap = plotW * 0.04, groupW = (plotW - gGap * (nCat + 1)) / nCat;
+  const bGap = nSer > 1 ? groupW * 0.06 : 0, bw = (groupW - bGap * (nSer - 1)) / nSer;
+  labels.forEach((l, ci) => {
+    const gx = x0 + gGap + ci * (groupW + gGap);
+    series.forEach((sr, si) => {
+      const v = sr.values[ci], h = Math.max(0.02, v / max * plotH), x = gx + si * (bw + bGap), y = baseline - h;
+      s.addShape(pptx.ShapeType.roundRect, { x, y, w: bw, h, fill: { color: colors[si] }, rectRadius: 0.03 });
+      if (nSer <= 2) s.addText(String(v), { x: x - 0.25, y: y - 0.32, w: bw + 0.5, h: 0.3, align: "center", fontSize: 10, bold: true, color: t.title, fontFace: t.bodyFont });
+    });
+    s.addText(l, { x: gx - 0.2, y: baseline + 0.06, w: groupW + 0.4, h: 0.4, align: "center", fontSize: 11, color: t.text, fontFace: t.bodyFont });
   });
 }
-function pptxLine(pptx, s, t, W, H, labels, values) {
-  const x0 = 1.0, plotW = W - 2.0, top = 2.55, baseline = 6.1, plotH = baseline - top;
-  const max = Math.max(...values, 1), n = values.length, slot = plotW / n;
+function pptxLine(pptx, s, t, W, H, labels, series, colors) {
+  const x0 = 1.3, plotW = W - 2.3, top = 2.6, baseline = 6.1, plotH = baseline - top;
+  const max = niceMax(Math.max(...series.flatMap(sr => sr.values), 1));
+  pptxAxis(pptx, s, t, x0, top, baseline, plotW, max);
+  pptxLegend(pptx, s, t, series, colors, W);
+  const n = labels.length, slot = plotW / n;
   const cx = k => x0 + slot * k + slot / 2, cy = v => baseline - v / max * plotH;
-  s.addShape(pptx.ShapeType.rect, { x: x0, y: baseline, w: plotW, h: 0.015, fill: { color: t.footer, transparency: 30 } });
-  for (let k = 0; k < n - 1; k++) {
-    const x1 = cx(k), y1 = cy(values[k]), x2 = cx(k + 1), y2 = cy(values[k + 1]);
-    const len = Math.hypot(x2 - x1, y2 - y1), ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-    s.addShape(pptx.ShapeType.rect, { x: (x1 + x2) / 2 - len / 2, y: (y1 + y2) / 2 - 0.02, w: len, h: 0.04, fill: { color: t.accent }, rotate: ang });
-  }
-  labels.forEach((l, k) => {
-    const x = cx(k), y = cy(values[k]);
-    s.addShape(pptx.ShapeType.ellipse, { x: x - 0.08, y: y - 0.08, w: 0.16, h: 0.16, fill: { color: t.accent } });
-    s.addText(String(values[k]), { x: x - 0.4, y: y - 0.42, w: 0.8, h: 0.3, align: "center", fontSize: 11, bold: true, color: t.title, fontFace: t.bodyFont });
-    s.addText(l, { x: x - slot / 2, y: baseline + 0.06, w: slot, h: 0.4, align: "center", fontSize: 11, color: t.text, fontFace: t.bodyFont });
+  series.forEach((sr, si) => {
+    const col = colors[si];
+    for (let k = 0; k < n - 1; k++) {
+      const x1 = cx(k), y1 = cy(sr.values[k]), x2 = cx(k + 1), y2 = cy(sr.values[k + 1]);
+      const len = Math.hypot(x2 - x1, y2 - y1), ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+      s.addShape(pptx.ShapeType.rect, { x: (x1 + x2) / 2 - len / 2, y: (y1 + y2) / 2 - 0.018, w: len, h: 0.036, fill: { color: col }, rotate: ang });
+    }
+    sr.values.forEach((v, k) => {
+      s.addShape(pptx.ShapeType.ellipse, { x: cx(k) - 0.07, y: cy(v) - 0.07, w: 0.14, h: 0.14, fill: { color: col } });
+      if (series.length <= 2) s.addText(String(v), { x: cx(k) - 0.4, y: cy(v) - 0.4, w: 0.8, h: 0.28, align: "center", fontSize: 10, bold: true, color: t.title, fontFace: t.bodyFont });
+    });
   });
+  labels.forEach((l, k) => s.addText(l, { x: cx(k) - slot / 2, y: baseline + 0.06, w: slot, h: 0.4, align: "center", fontSize: 11, color: t.text, fontFace: t.bodyFont }));
 }
 function pptxPie(pptx, s, t, W, H, labels, values, colors) {
   const total = values.reduce((a, b) => a + b, 0) || 1;
@@ -766,6 +870,31 @@ function pptxPie(pptx, s, t, W, H, labels, values, colors) {
 function pptxCover(pptx, t, W, H) {
   const s = pptx.addSlide();
   s.background = { color: t.coverBg };
+  const style = state.coverStyle || "left";
+
+  if (style === "center") {
+    s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.18, fill: { color: t.coverAccent } });
+    s.addShape(pptx.ShapeType.rect, { x: 0, y: H - 0.18, w: W, h: 0.18, fill: { color: t.coverAccent } });
+    s.addText(kickerText(), { x: 1, y: 2.05, w: W - 2, h: 0.4, fontSize: 13, bold: true, color: t.coverAccent, charSpacing: 3, align: "center", fontFace: t.bodyFont });
+    s.addText(state.deck.title, { x: 1, y: 2.5, w: W - 2, h: 1.7, fontFace: t.titleFont, fontSize: 44, bold: true, color: t.coverText, align: "center", valign: "middle" });
+    s.addShape(pptx.ShapeType.rect, { x: (W - 2.2) / 2, y: 4.35, w: 2.2, h: 0.06, fill: { color: t.coverAccent } });
+    if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 1.5, y: 4.6, w: W - 3, h: 0.9, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, align: "center", transparency: 10 });
+    drawLogo(s, W, 0.7, 0.5);
+    return;
+  }
+  if (style === "full") {
+    // 滿版橫幅：標題落在整條強調色帶上
+    const bandY = 2.55, bandH = 2.1;
+    s.addText(kickerText(), { x: 1, y: bandY - 0.55, w: W - 2, h: 0.4, fontSize: 13, bold: true, color: t.coverAccent, charSpacing: 3, fontFace: t.bodyFont });
+    s.addShape(pptx.ShapeType.rect, { x: 0, y: bandY, w: W, h: bandH, fill: { color: t.coverAccent } });
+    const bandText = isDark(t.coverAccent) ? "FFFFFF" : "1A1A1A";
+    s.addText(state.deck.title, { x: 0.9, y: bandY, w: W - 1.8, h: bandH, fontFace: t.titleFont, fontSize: 46, bold: true, color: bandText, align: "left", valign: "middle" });
+    if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 0.95, y: bandY + bandH + 0.25, w: W - 3, h: 0.9, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, transparency: 8 });
+    s.addText("AI 簡報生成器", { x: 0.95, y: H - 0.7, w: 6, h: 0.35, fontSize: 10.5, color: t.coverText, transparency: 40, fontFace: t.bodyFont });
+    drawLogo(s, W, 0.7, 0.5);
+    return;
+  }
+  // left（經典）
   s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.32, h: H, fill: { color: t.coverAccent } });
   s.addShape(pptx.ShapeType.rect, { x: W - 3.4, y: H - 3.4, w: 2.6, h: 2.6, fill: { color: t.coverAccent, transparency: 82 } });
   s.addShape(pptx.ShapeType.rect, { x: W - 2.3, y: H - 2.3, w: 2.6, h: 2.6, fill: { color: t.coverAccent, transparency: 90 } });
@@ -943,6 +1072,7 @@ function applyBrandUI() {
   $("#logoPreview").hidden = !hasLogo;
   $("#clearLogo").hidden = !hasLogo;
   if (hasLogo) $("#logoPreview").src = state.logo.data;
+  $$("#coverStyleSeg .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.cover === (state.coverStyle || "left")));
 }
 function applyAccentFromInput() {
   let v = ($("#accentHex").value.trim() || $("#accentPicker").value).replace(/[^#0-9a-fA-F]/g, "");
@@ -973,7 +1103,7 @@ function handleLogoFile(file) {
 function resetAll() {
   if (!confirm("確定要清除目前的主題、大綱與進度，重新開始嗎？（API 設定會保留）")) return;
   clearState();
-  Object.assign(state, { purpose: null, topic: "", direction: "", audience: "", slideCount: 10, lang: "繁體中文", tone: "清楚易懂", deck: null, theme: THEMES[0].id, customAccent: null, logo: null, step: 1, previewIdx: 0 });
+  Object.assign(state, { purpose: null, topic: "", direction: "", audience: "", slideCount: 10, lang: "繁體中文", tone: "清楚易懂", deck: null, theme: THEMES[0].id, customAccent: null, logo: null, coverStyle: "left", step: 1, previewIdx: 0 });
   ["topicInput", "directionInput", "audienceInput"].forEach(id => $("#" + id).value = "");
   $("#slideCount").value = "10"; $("#langSelect").value = "繁體中文"; $("#toneSelect").value = "清楚易懂";
   $("#slidesEditor").innerHTML = "";
@@ -1018,6 +1148,11 @@ function bindEvents() {
   $("#logoBtn").addEventListener("click", () => $("#logoFile").click());
   $("#logoFile").addEventListener("change", e => { if (e.target.files[0]) handleLogoFile(e.target.files[0]); e.target.value = ""; });
   $("#clearLogo").addEventListener("click", () => { state.logo = null; applyBrandUI(); saveState(); toast("已移除 Logo"); });
+  $$("#coverStyleSeg .seg-btn").forEach(b => b.addEventListener("click", () => {
+    state.coverStyle = b.dataset.cover;
+    $$("#coverStyleSeg .seg-btn").forEach(x => x.classList.toggle("active", x === b));
+    saveState();
+  }));
 
   // 重設
   $("#resetAllBtn").addEventListener("click", resetAll);

@@ -144,7 +144,9 @@ function gradientCss(kind, t){
 }
 // 由主色/輔色推導的圖表色盤
 function chartPalette(t, n){
-  const base = [t.accent, t.accent2, lighten(t.accent, 0.28), darken(t.accent, 0.2), lighten(t.accent2, 0.2), mix(t.accent, t.accent2, 0.5)];
+  const base = t.clean
+    ? [t.accent, "9AA0A6", "5F6368", "C8CCD1", "E5A0B4", "3C4043"]   // Avon Red + 中性色（品牌規範）
+    : [t.accent, t.accent2, lighten(t.accent, 0.28), darken(t.accent, 0.2), lighten(t.accent2, 0.2), mix(t.accent, t.accent2, 0.5)];
   const out = [];
   for (let i = 0; i < n; i++) out.push(base[i % base.length]);
   return out;
@@ -609,8 +611,9 @@ function sectionNumberFor(idx) {
   for (let k = 0; k <= idx; k++) if ((state.deck.slides[k].layout || "bullets") === "section") n++;
   return n;
 }
-function logoImg(cls) {
-  return state.logo && state.logo.data ? `<img class="pv-logo ${cls || ""}" src="${state.logo.data}" alt="logo" />` : "";
+function logoImg(cls, allowBrand) {
+  const logo = effectiveLogo(allowBrand);
+  return logo && logo.data ? `<img class="pv-logo ${cls || ""}" src="${logo.data}" alt="logo" />` : "";
 }
 // 圖例（SVG）
 function pvLegendSvg(series, col, t, x0) {
@@ -686,13 +689,13 @@ function renderPreview() {
       <span style="color:#${t.footer}">${i + 1} / ${state.deck.slides.length}</span></div>`;
   const header = title => `
       <div class="pv-strip" style="background:#${t.accent}"></div>
-      ${logoImg()}
+      ${logoImg("", true)}
       <div class="pv-kicker" style="color:#${t.accent}">${escapeHtml(kickerText())}</div>
       <div class="pv-title" style="color:#${t.title}">${escapeHtml(title)}</div>
       <div class="pv-underline" style="background:#${t.accent}"></div>`;
 
   if (item.type === "cover") {
-    stage.style.background = gradientCss("cover", t);
+    stage.style.background = t.clean ? "#" + t.coverBg : gradientCss("cover", t);
     const cs = state.coverStyle || "left";
     if (cs === "center") {
       stage.innerHTML = `
@@ -722,7 +725,7 @@ function renderPreview() {
     return;
   }
   if (item.type === "closing") {
-    stage.style.background = gradientCss("cover", t);
+    stage.style.background = t.clean ? "#" + t.coverBg : gradientCss("cover", t);
     stage.innerHTML = `
       <div class="pv-end-title" style="color:#${t.coverText}">謝謝聆聽</div>
       <div class="pv-end-sub" style="color:#${t.coverText}">THANK YOU</div>
@@ -734,7 +737,7 @@ function renderPreview() {
   const layout = sl.layout || "bullets";
 
   if (layout === "section") {
-    stage.style.background = gradientCss("section", t);
+    stage.style.background = t.clean ? "#" + t.coverBg : gradientCss("section", t);
     const no = String(sectionNumberFor(item.i)).padStart(2, "0");
     stage.innerHTML = `
       <div class="pv-sidebar" style="background:#${t.coverAccent}"></div>
@@ -756,9 +759,9 @@ function renderPreview() {
     const ms = parseMetrics(sl.bullets);
     if (ms.length) {
       stage.style.background = "#" + t.bg;
-      const cardBg = mix(t.accent, t.bg, 0.9), cardLine = mix(t.accent, t.bg, 0.72);
+      const cardBg = t.clean ? "FFFFFF" : mix(t.accent, t.bg, 0.9), cardLine = t.clean ? "E6E6E6" : mix(t.accent, t.bg, 0.72);
       const cards = ms.slice(0, 4).map(m => `
-        <div class="pv-card" style="background:#${cardBg};border-color:#${cardLine}">
+        <div class="pv-card${t.clean ? " pv-card-flat" : ""}" style="background:#${cardBg};border-color:#${cardLine}">
           <div class="pv-card-tick" style="background:#${t.accent}"></div>
           <div class="pv-card-val" style="color:#${t.accent}">${escapeHtml(m.value)}</div>
           <div class="pv-card-lbl" style="color:#${t.text}">${escapeHtml(m.label)}</div>
@@ -777,10 +780,21 @@ function renderPreview() {
       + foot(item.i);
     return;
   }
-  // 條列（編號卡片，含自動雙欄）
+  // 條列
   stage.style.background = "#" + t.bg;
-  const panel = mix(t.accent, t.bg, 0.92), chipText = isDark(t.accent) ? "FFFFFF" : "111111";
   let idx = 0;
+  if (t.clean) {
+    // 乾淨模式：紅色編號 + 文字 + 細分隔線
+    const cols = splitCols(sl.bullets).map(col => `
+      <div class="pv-col">${col.map(b => { idx++; return `
+        <div class="pv-crow">
+          <span class="pv-cnum" style="color:#${t.accent}">${String(idx).padStart(2, "0")}</span>
+          <span class="pv-btext" style="color:#${t.text}">${escapeHtml(b)}</span>
+        </div>`; }).join("")}</div>`).join("");
+    stage.innerHTML = header(sl.title) + `<div class="pv-body pv-cleanlist">${cols}</div>` + foot(item.i);
+    return;
+  }
+  const panel = mix(t.accent, t.bg, 0.92), chipText = isDark(t.accent) ? "FFFFFF" : "111111";
   const cols = splitCols(sl.bullets).map(col => `
     <div class="pv-col">${col.map(b => { idx++; return `
       <div class="pv-brow" style="background:#${panel}">
@@ -804,17 +818,25 @@ function pptxFooter(pptx, s, t, W, H, i, total) {
   s.addText(state.deck.title, { x: 0.98, y: H - 0.56, w: W - 3.4, h: 0.3, fontSize: 9.5, color: t.footer, valign: "middle", fontFace: t.bodyFont });
   s.addText(`${i + 1} / ${total}`, { x: W - 1.6, y: H - 0.56, w: 0.88, h: 0.3, fontSize: 9.5, color: t.footer, align: "right", valign: "middle", fontFace: t.bodyFont });
 }
-function drawLogo(s, W, maxH, y) {
-  if (!state.logo || !state.logo.data) return;
-  const { data, w, h } = state.logo;
+function drawLogo(s, W, maxH, y, allowBrand) {
+  const logo = effectiveLogo(allowBrand);
+  if (!logo || !logo.data) return;
+  const { data, w, h } = logo;
   const hh = maxH, ww = hh * (w / h);
   try { s.addImage({ data, x: W - 0.72 - ww, y, w: ww, h: hh }); } catch (e) { /* 忽略無效圖檔 */ }
 }
-// 漸層背景（滿版圖片）；產圖失敗則退回純色
+// 漸層背景（滿版圖片）；乾淨模式或產圖失敗則退回純色
 function slideBgImage(s, W, H, t, kind) {
+  if (t.clean) { s.background = { color: t.coverBg }; return; }
   const data = makeGradient(kind, t);
   if (data) s.addImage({ data, x: 0, y: 0, w: W, h: H });
   else s.background = { color: t.coverBg };
+}
+// 目前有效的 Logo：使用者上傳優先；否則若為品牌主題且允許，用官方品牌 Logo
+function effectiveLogo(allowBrand) {
+  if (state.logo && state.logo.data) return state.logo;
+  if (allowBrand) { const at = activeTheme(); if (at.brand === "avon" && typeof AVON_LOGO !== "undefined") return AVON_LOGO; }
+  return null;
 }
 // 圖表以向量圖形繪製（相容性最佳，不依賴內嵌 Excel 的 addChart）
 function pptxChart(pptx, s, t, W, H, sl, i, total) {
@@ -911,7 +933,7 @@ function pptxCover(pptx, t, W, H) {
   const s = pptx.addSlide();
   slideBgImage(s, W, H, t, "cover");
   const style = state.coverStyle || "left";
-  const titleShadow = { type: "outer", angle: 90, blur: 10, offset: 3, color: "000000", opacity: 0.25 };
+  const titleShadow = t.clean ? undefined : { type: "outer", angle: 90, blur: 10, offset: 3, color: "000000", opacity: 0.25 };
 
   if (style === "center") {
     s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.18, fill: { color: t.coverAccent } });
@@ -920,7 +942,7 @@ function pptxCover(pptx, t, W, H) {
     s.addText(state.deck.title, { x: 1, y: 2.5, w: W - 2, h: 1.7, fontFace: t.titleFont, fontSize: 44, bold: true, color: t.coverText, align: "center", valign: "middle", shadow: titleShadow });
     s.addShape(pptx.ShapeType.rect, { x: (W - 2.2) / 2, y: 4.35, w: 2.2, h: 0.06, fill: { color: t.coverAccent } });
     if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 1.5, y: 4.6, w: W - 3, h: 0.9, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, align: "center", transparency: 10 });
-    drawLogo(s, W, 0.7, 0.5);
+    drawLogo(s, W, 0.7, 0.5, false);
     return;
   }
   if (style === "full") {
@@ -932,7 +954,7 @@ function pptxCover(pptx, t, W, H) {
     s.addText(state.deck.title, { x: 0.9, y: bandY, w: W - 1.8, h: bandH, fontFace: t.titleFont, fontSize: 46, bold: true, color: bandText, align: "left", valign: "middle" });
     if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 0.95, y: bandY + bandH + 0.25, w: W - 3, h: 0.9, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, transparency: 8 });
     s.addText("AI 簡報生成器", { x: 0.95, y: H - 0.7, w: 6, h: 0.35, fontSize: 10.5, color: t.coverText, transparency: 40, fontFace: t.bodyFont });
-    drawLogo(s, W, 0.7, 0.5);
+    drawLogo(s, W, 0.7, 0.5, false);
     return;
   }
   // left（經典）
@@ -944,7 +966,7 @@ function pptxCover(pptx, t, W, H) {
   s.addShape(pptx.ShapeType.rect, { x: 0.95, y: 4.2, w: 2.2, h: 0.06, fill: { color: t.coverAccent } });
   if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 0.95, y: 4.45, w: W - 3, h: 1.0, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, transparency: 10 });
   s.addText("AI 簡報生成器", { x: 0.95, y: H - 0.7, w: 6, h: 0.35, fontSize: 10.5, color: t.coverText, transparency: 40, fontFace: t.bodyFont });
-  drawLogo(s, W, 0.7, 0.5);
+  drawLogo(s, W, 0.7, 0.5, false);
 }
 function pptxSection(pptx, s, t, W, H, sl, no) {
   slideBgImage(s, W, H, t, "section");
@@ -954,9 +976,27 @@ function pptxSection(pptx, s, t, W, H, sl, no) {
   s.addText(sl.title, { x: 0.9, y: 4.15, w: W - 1.8, h: 1.3, fontSize: 40, bold: true, color: t.coverText, fontFace: t.titleFont });
   if (sl.bullets[0]) s.addText(sl.bullets[0], { x: 0.95, y: 5.45, w: W - 2, h: 0.9, fontSize: 16, color: t.coverText, transparency: 15, fontFace: t.bodyFont });
 }
+function pptxBulletsClean(pptx, s, t, W, H, bullets) {
+  // 乾淨模式：紅色編號 + 文字 + 細分隔線，充足留白（Avon 品牌規範）
+  const cols = splitCols(bullets), top = 2.0, availH = H - 2.85, colGap = 0.55;
+  const colW = (W - 1.44 - (cols.length - 1) * colGap) / cols.length;
+  const maxN = Math.max(...cols.map(c => c.length), 1);
+  const fs = maxN <= 4 ? 18 : maxN <= 6 ? 16 : 14;
+  let idx = 0;
+  cols.forEach((col, ci) => {
+    const x = 0.72 + ci * (colW + colGap), n = col.length, rowH = availH / n;
+    col.forEach((b, k) => {
+      idx++; const y = top + k * rowH;
+      s.addText(String(idx).padStart(2, "0"), { x, y, w: 0.62, h: rowH, valign: "middle", fontSize: fs + 3, bold: true, color: t.accent, fontFace: t.titleFont });
+      s.addText(b, { x: x + 0.72, y, w: colW - 0.72, h: rowH, valign: "middle", fontSize: fs, color: t.text, fontFace: t.bodyFont, lineSpacingMultiple: 1.08 });
+      if (k < n - 1) s.addShape(pptx.ShapeType.rect, { x: x + 0.04, y: y + rowH - 0.008, w: colW - 0.08, h: 0.008, fill: { color: "E8E8E8" } });
+    });
+  });
+}
 function pptxBullets(pptx, s, t, W, H, sl, i, total) {
   pptxHeader(pptx, s, t, W, sl.title);
   const bullets = sl.bullets.length ? sl.bullets : [""];
+  if (t.clean) { pptxBulletsClean(pptx, s, t, W, H, bullets); pptxFooter(pptx, s, t, W, H, i, total); return; }
   const cols = splitCols(bullets);
   const top = 1.98, availH = H - 2.78, colGap = 0.35;
   const colW = (W - 1.44 - (cols.length - 1) * colGap) / cols.length;
@@ -983,10 +1023,11 @@ function pptxMetrics(pptx, s, t, W, H, sl, metrics, i, total) {
   pptxHeader(pptx, s, t, W, sl.title);
   const n = Math.min(metrics.length, 4);
   const gap = 0.35, cardW = (W - 1.44 - gap * (n - 1)) / n, y = 2.55, cardH = 2.7;
-  const cardBg = mix(t.accent, t.bg, 0.9), cardLine = mix(t.accent, t.bg, 0.7);
+  const cardBg = t.clean ? "FFFFFF" : mix(t.accent, t.bg, 0.9);
+  const cardLine = t.clean ? "E6E6E6" : mix(t.accent, t.bg, 0.7);
   metrics.slice(0, n).forEach((m, k) => {
     const x = 0.72 + k * (cardW + gap);
-    s.addShape(pptx.ShapeType.roundRect, { x, y, w: cardW, h: cardH, fill: { color: cardBg }, line: { color: cardLine, width: 1 }, rectRadius: 0.1, shadow: SHADOW });
+    s.addShape(pptx.ShapeType.roundRect, { x, y, w: cardW, h: cardH, fill: { color: cardBg }, line: { color: cardLine, width: 1 }, rectRadius: t.clean ? 0.05 : 0.1, shadow: t.clean ? undefined : SHADOW });
     s.addShape(pptx.ShapeType.rect, { x: x + 0.3, y: y + 0.4, w: 0.5, h: 0.08, fill: { color: t.accent } });
     s.addText(String(m.value), { x, y: y + 0.55, w: cardW, h: 1.1, align: "center", fontSize: 40, bold: true, color: t.accent, fontFace: t.titleFont });
     s.addText(String(m.label), { x: x + 0.25, y: y + 1.7, w: cardW - 0.5, h: 0.85, align: "center", valign: "top", fontSize: 14, color: t.text, fontFace: t.bodyFont });
@@ -1005,10 +1046,10 @@ function pptxClosing(pptx, t, W, H) {
   const s = pptx.addSlide();
   slideBgImage(s, W, H, t, "cover");
   s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.32, h: H, fill: { color: t.coverAccent } });
-  s.addText("謝謝聆聽", { x: 0.9, y: 2.6, w: W - 1.8, h: 1.3, fontSize: 48, bold: true, color: t.coverText, fontFace: t.titleFont, shadow: { type: "outer", angle: 90, blur: 10, offset: 3, color: "000000", opacity: 0.25 } });
+  s.addText("謝謝聆聽", { x: 0.9, y: 2.6, w: W - 1.8, h: 1.3, fontSize: 48, bold: true, color: t.coverText, fontFace: t.titleFont, shadow: t.clean ? undefined : { type: "outer", angle: 90, blur: 10, offset: 3, color: "000000", opacity: 0.25 } });
   s.addText("THANK YOU", { x: 0.95, y: 3.95, w: 6, h: 0.5, fontSize: 15, color: t.coverText, transparency: 30, charSpacing: 4, fontFace: t.bodyFont });
   if (state.deck.title) s.addText(state.deck.title, { x: 0.95, y: H - 1.0, w: W - 2, h: 0.5, fontSize: 13, color: t.coverText, transparency: 30, fontFace: t.bodyFont });
-  drawLogo(s, W, 0.6, 0.5);
+  drawLogo(s, W, 0.6, 0.5, false);
 }
 
 function generatePptx() {
@@ -1037,7 +1078,7 @@ function generatePptx() {
       else if (layout === "chart") pptxChart(pptx, s, t, W, H, sl, i, total);
       else if (layout === "quote") pptxQuote(pptx, s, t, W, H, sl, i, total);
       else pptxBullets(pptx, s, t, W, H, sl, i, total);
-      drawLogo(s, W, isCoverLike ? 0.6 : 0.4, isCoverLike ? 0.5 : 0.34);
+      drawLogo(s, W, isCoverLike ? 0.6 : 0.4, isCoverLike ? 0.5 : 0.34, !isCoverLike);
       if (sl.notes) s.addNotes(sl.notes);
     });
     pptxClosing(pptx, t, W, H);

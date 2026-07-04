@@ -67,15 +67,16 @@ const PURPOSES = [
    ========================================================= */
 const THEMES = [
   {
-    // 配色取自 Avon「Business Case for Malaysia」官方簡報的主要填色：
-    // #E5004B 品牌粉、#AC0038 深粉、#F66F7C 珊瑚粉、#FDE2E5/#FFF4F7 淺粉底
+    // Avon 官方品牌規範（avon-brand-guidelines skill）：
+    // 官方色 Avon Red #E5004B（取自官方 logo）、字體 Lato、乾淨結構、避免漸層與過度陰影、官方 logo。
     id: "avon",
-    name: "Avon 雅芳品牌",
-    subtitle: "官方品牌粉 · 精緻 · 美妝首選",
-    bg: "FFF7FA", titleBg: "AC0038", title: "AC0038", text: "3D2A30",
-    accent: "E5004B", accent2: "F66F7C", bullet: "E5004B", footer: "D9A7B2",
-    titleFont: "Microsoft JhengHei", bodyFont: "Microsoft JhengHei",
-    coverBg: "E5004B", coverText: "FFFFFF", coverAccent: "FFD1DC"
+    name: "Avon 官方品牌",
+    subtitle: "Avon Red · Lato · 官方規範乾淨版",
+    clean: true, brand: "avon",   // 乾淨模式：無漸層、無陰影、官方 logo
+    bg: "FFFFFF", titleBg: "E5004B", title: "1A1A1A", text: "2B2B2B",
+    accent: "E5004B", accent2: "E5004B", bullet: "E5004B", footer: "8A8A8A",
+    titleFont: "Lato", bodyFont: "Lato",
+    coverBg: "E5004B", coverText: "FFFFFF", coverAccent: "FFFFFF"
   },
   {
     id: "corporate",

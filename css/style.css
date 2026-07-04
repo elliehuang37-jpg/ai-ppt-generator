@@ -242,6 +242,12 @@ textarea{resize:vertical}
 .pv-btext{font-size:clamp(10px,2vw,16px);line-height:1.22}
 /* KPI 卡加陰影 */
 .pv-card{box-shadow:0 4px 12px rgba(10,20,40,.18)}
+.pv-card-flat{box-shadow:none;border:1px solid #E6E6E6}
+/* 乾淨模式：編號清單（Avon 品牌） */
+.pv-cleanlist .pv-col{justify-content:center;gap:0}
+.pv-crow{display:flex;align-items:center;gap:3.5%;padding:3% 1%;border-bottom:1px solid #EAEAEA;flex:1;min-height:0}
+.pv-crow:last-child{border-bottom:none}
+.pv-cnum{flex:0 0 auto;font-weight:800;font-size:clamp(11px,2.3vw,19px);min-width:1.6em}
 /* 結尾頁 */
 .pv-end-title{position:absolute;inset:auto 0 auto 0;top:38%;display:block;text-align:center;font-weight:900;font-size:clamp(20px,5vw,48px)}
 .pv-end-sub{position:absolute;left:0;right:0;top:57%;text-align:center;font-size:clamp(10px,1.8vw,15px);letter-spacing:.32em;opacity:.6}

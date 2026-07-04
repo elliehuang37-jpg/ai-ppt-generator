@@ -235,6 +235,17 @@ textarea{resize:vertical}
 .pv-cvF-title{padding:0 6.8%;font-weight:900;font-size:clamp(18px,4.8vw,46px);line-height:1.1}
 .pv-cvF-sub{position:absolute;top:66%;left:6.9%;right:10%;font-size:clamp(11px,2.3vw,20px);opacity:.9}
 
+/* 編號卡片式重點 */
+.pv-cardlist .pv-col{justify-content:center;gap:3.2%}
+.pv-brow{display:flex;align-items:center;gap:3%;border-radius:8px;padding:2.4% 3.6%;box-shadow:0 3px 9px rgba(10,20,40,.20);flex:1;min-height:0}
+.pv-bnum{flex:0 0 auto;width:clamp(16px,3.6vw,27px);height:clamp(16px,3.6vw,27px);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:clamp(8px,1.7vw,13px)}
+.pv-btext{font-size:clamp(10px,2vw,16px);line-height:1.22}
+/* KPI 卡加陰影 */
+.pv-card{box-shadow:0 4px 12px rgba(10,20,40,.18)}
+/* 結尾頁 */
+.pv-end-title{position:absolute;inset:auto 0 auto 0;top:38%;display:block;text-align:center;font-weight:900;font-size:clamp(20px,5vw,48px)}
+.pv-end-sub{position:absolute;left:0;right:0;top:57%;text-align:center;font-size:clamp(10px,1.8vw,15px);letter-spacing:.32em;opacity:.6}
+
 /* ---- Theme grid ---- */
 .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
 .theme-card{cursor:pointer;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--card);transition:.2s}

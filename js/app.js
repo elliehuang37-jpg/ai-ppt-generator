@@ -110,6 +110,38 @@ function parseMetrics(bullets){
 // 目前簡報的 eyebrow 小標（用簡報目的名稱）
 function kickerText(){ const p = PURPOSES.find(x => x.id === state.purpose); return p ? p.name : ""; }
 
+// 視覺質感：陰影 + 漸層背景（canvas 產生圖片，跨投影片以快取重用）
+const SHADOW = { type: "outer", angle: 90, blur: 9, offset: 3, color: "1A2740", opacity: 0.22 };
+function rgbaStr(hex, a){ const [r, g, b] = _rgb(hex); return `rgba(${r},${g},${b},${a})`; }
+const _bgCache = {};
+function makeGradient(kind, t){
+  const key = kind + t.coverBg + t.coverAccent;
+  if (_bgCache[key]) return _bgCache[key];
+  const W = 1280, H = 720, cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const g = cv.getContext("2d");
+  const b1 = kind === "section" ? darken(t.coverBg, 0.12) : t.coverBg;
+  const b2 = kind === "section" ? mix(t.coverBg, t.coverAccent, 0.12) : darken(t.coverBg, 0.42);
+  const lin = g.createLinearGradient(0, 0, W * 0.65, H);
+  lin.addColorStop(0, "#" + b1); lin.addColorStop(1, "#" + b2);
+  g.fillStyle = lin; g.fillRect(0, 0, W, H);
+  const blob = (cx, cy, r, a) => {
+    const rg = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+    rg.addColorStop(0, rgbaStr(t.coverAccent, a)); rg.addColorStop(1, rgbaStr(t.coverAccent, 0));
+    g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  };
+  blob(W * 0.83, H * 0.16, 560, 0.32); blob(W * 0.04, H * 0.97, 520, 0.16);
+  let d; try { d = cv.toDataURL("image/jpeg", 0.85); } catch (e) { d = null; }
+  _bgCache[key] = d; return d;
+}
+// 預覽用的漸層 CSS（與 makeGradient 對應）
+function gradientCss(kind, t){
+  const b1 = kind === "section" ? darken(t.coverBg, 0.12) : t.coverBg;
+  const b2 = kind === "section" ? mix(t.coverBg, t.coverAccent, 0.12) : darken(t.coverBg, 0.42);
+  return `radial-gradient(circle at 83% 16%, ${rgbaStr(t.coverAccent, 0.32)}, transparent 42%),`
+    + `radial-gradient(circle at 4% 97%, ${rgbaStr(t.coverAccent, 0.16)}, transparent 40%),`
+    + `linear-gradient(135deg, #${b1}, #${b2})`;
+}
 // 由主色/輔色推導的圖表色盤
 function chartPalette(t, n){
   const base = [t.accent, t.accent2, lighten(t.accent, 0.28), darken(t.accent, 0.2), lighten(t.accent2, 0.2), mix(t.accent, t.accent2, 0.5)];
@@ -660,7 +692,7 @@ function renderPreview() {
       <div class="pv-underline" style="background:#${t.accent}"></div>`;
 
   if (item.type === "cover") {
-    stage.style.background = "#" + t.coverBg;
+    stage.style.background = gradientCss("cover", t);
     const cs = state.coverStyle || "left";
     if (cs === "center") {
       stage.innerHTML = `
@@ -690,10 +722,10 @@ function renderPreview() {
     return;
   }
   if (item.type === "closing") {
-    stage.style.background = "#" + t.coverBg;
+    stage.style.background = gradientCss("cover", t);
     stage.innerHTML = `
-      <div class="pv-sidebar" style="background:#${t.coverAccent}"></div>
       <div class="pv-end-title" style="color:#${t.coverText}">謝謝聆聽</div>
+      <div class="pv-end-sub" style="color:#${t.coverText}">THANK YOU</div>
       <div class="pv-cover-bar" style="background:#${t.coverAccent}"></div>`;
     return;
   }
@@ -702,7 +734,7 @@ function renderPreview() {
   const layout = sl.layout || "bullets";
 
   if (layout === "section") {
-    stage.style.background = "#" + t.coverBg;
+    stage.style.background = gradientCss("section", t);
     const no = String(sectionNumberFor(item.i)).padStart(2, "0");
     stage.innerHTML = `
       <div class="pv-sidebar" style="background:#${t.coverAccent}"></div>
@@ -745,16 +777,17 @@ function renderPreview() {
       + foot(item.i);
     return;
   }
-  // 條列（預設，含自動雙欄）
+  // 條列（編號卡片，含自動雙欄）
   stage.style.background = "#" + t.bg;
+  const panel = mix(t.accent, t.bg, 0.92), chipText = isDark(t.accent) ? "FFFFFF" : "111111";
+  let idx = 0;
   const cols = splitCols(sl.bullets).map(col => `
-    <div class="pv-col">${col.map(b => `
-      <div class="pv-bullet" style="color:#${t.text}">
-        <span class="pv-dot" style="background:#${t.bullet}"></span><span>${escapeHtml(b)}</span>
-      </div>`).join("")}</div>`).join("");
-  stage.innerHTML = header(sl.title)
-    + `<div class="pv-rail" style="background:#${t.accent2}"></div>`
-    + `<div class="pv-body pv-body-rail">${cols}</div>` + foot(item.i);
+    <div class="pv-col">${col.map(b => { idx++; return `
+      <div class="pv-brow" style="background:#${panel}">
+        <span class="pv-bnum" style="background:#${t.accent};color:#${chipText}">${String(idx).padStart(2, "0")}</span>
+        <span class="pv-btext" style="color:#${t.text}">${escapeHtml(b)}</span>
+      </div>`; }).join("")}</div>`).join("");
+  stage.innerHTML = header(sl.title) + `<div class="pv-body pv-cardlist">${cols}</div>` + foot(item.i);
 }
 
 /* ---------- 生成 PPTX（多版型專業排版） ---------- */
@@ -763,6 +796,7 @@ function pptxHeader(pptx, s, t, W, title) {
   s.addText(kickerText(), { x: 0.72, y: 0.42, w: W - 1.4, h: 0.3, fontSize: 12, bold: true, color: t.accent, charSpacing: 2, fontFace: t.bodyFont });
   s.addText(title, { x: 0.7, y: 0.74, w: W - 1.4, h: 0.85, fontFace: t.titleFont, fontSize: 28, bold: true, color: t.title, align: "left", valign: "middle" });
   s.addShape(pptx.ShapeType.rect, { x: 0.72, y: 1.68, w: 1.7, h: 0.07, fill: { color: t.accent } });
+  s.addShape(pptx.ShapeType.rect, { x: 2.5, y: 1.705, w: W - 3.22, h: 0.014, fill: { color: t.accent2, transparency: 55 } });
 }
 function pptxFooter(pptx, s, t, W, H, i, total) {
   s.addShape(pptx.ShapeType.rect, { x: 0.72, y: H - 0.62, w: W - 1.44, h: 0.012, fill: { color: t.footer, transparency: 45 } });
@@ -775,6 +809,12 @@ function drawLogo(s, W, maxH, y) {
   const { data, w, h } = state.logo;
   const hh = maxH, ww = hh * (w / h);
   try { s.addImage({ data, x: W - 0.72 - ww, y, w: ww, h: hh }); } catch (e) { /* 忽略無效圖檔 */ }
+}
+// 漸層背景（滿版圖片）；產圖失敗則退回純色
+function slideBgImage(s, W, H, t, kind) {
+  const data = makeGradient(kind, t);
+  if (data) s.addImage({ data, x: 0, y: 0, w: W, h: H });
+  else s.background = { color: t.coverBg };
 }
 // 圖表以向量圖形繪製（相容性最佳，不依賴內嵌 Excel 的 addChart）
 function pptxChart(pptx, s, t, W, H, sl, i, total) {
@@ -869,14 +909,15 @@ function pptxPie(pptx, s, t, W, H, labels, values, colors) {
 }
 function pptxCover(pptx, t, W, H) {
   const s = pptx.addSlide();
-  s.background = { color: t.coverBg };
+  slideBgImage(s, W, H, t, "cover");
   const style = state.coverStyle || "left";
+  const titleShadow = { type: "outer", angle: 90, blur: 10, offset: 3, color: "000000", opacity: 0.25 };
 
   if (style === "center") {
     s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.18, fill: { color: t.coverAccent } });
     s.addShape(pptx.ShapeType.rect, { x: 0, y: H - 0.18, w: W, h: 0.18, fill: { color: t.coverAccent } });
     s.addText(kickerText(), { x: 1, y: 2.05, w: W - 2, h: 0.4, fontSize: 13, bold: true, color: t.coverAccent, charSpacing: 3, align: "center", fontFace: t.bodyFont });
-    s.addText(state.deck.title, { x: 1, y: 2.5, w: W - 2, h: 1.7, fontFace: t.titleFont, fontSize: 44, bold: true, color: t.coverText, align: "center", valign: "middle" });
+    s.addText(state.deck.title, { x: 1, y: 2.5, w: W - 2, h: 1.7, fontFace: t.titleFont, fontSize: 44, bold: true, color: t.coverText, align: "center", valign: "middle", shadow: titleShadow });
     s.addShape(pptx.ShapeType.rect, { x: (W - 2.2) / 2, y: 4.35, w: 2.2, h: 0.06, fill: { color: t.coverAccent } });
     if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 1.5, y: 4.6, w: W - 3, h: 0.9, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, align: "center", transparency: 10 });
     drawLogo(s, W, 0.7, 0.5);
@@ -899,14 +940,14 @@ function pptxCover(pptx, t, W, H) {
   s.addShape(pptx.ShapeType.rect, { x: W - 3.4, y: H - 3.4, w: 2.6, h: 2.6, fill: { color: t.coverAccent, transparency: 82 } });
   s.addShape(pptx.ShapeType.rect, { x: W - 2.3, y: H - 2.3, w: 2.6, h: 2.6, fill: { color: t.coverAccent, transparency: 90 } });
   s.addText(kickerText(), { x: 0.95, y: 1.75, w: W - 2, h: 0.4, fontSize: 13, bold: true, color: t.coverAccent, charSpacing: 3, fontFace: t.bodyFont });
-  s.addText(state.deck.title, { x: 0.9, y: 2.2, w: W - 3, h: 1.9, fontFace: t.titleFont, fontSize: 44, bold: true, color: t.coverText, align: "left", valign: "top" });
+  s.addText(state.deck.title, { x: 0.9, y: 2.2, w: W - 3, h: 1.9, fontFace: t.titleFont, fontSize: 44, bold: true, color: t.coverText, align: "left", valign: "top", shadow: titleShadow });
   s.addShape(pptx.ShapeType.rect, { x: 0.95, y: 4.2, w: 2.2, h: 0.06, fill: { color: t.coverAccent } });
   if (state.deck.subtitle) s.addText(state.deck.subtitle, { x: 0.95, y: 4.45, w: W - 3, h: 1.0, fontFace: t.bodyFont, fontSize: 18, color: t.coverText, transparency: 10 });
   s.addText("AI 簡報生成器", { x: 0.95, y: H - 0.7, w: 6, h: 0.35, fontSize: 10.5, color: t.coverText, transparency: 40, fontFace: t.bodyFont });
   drawLogo(s, W, 0.7, 0.5);
 }
 function pptxSection(pptx, s, t, W, H, sl, no) {
-  s.background = { color: t.coverBg };
+  slideBgImage(s, W, H, t, "section");
   s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.32, h: H, fill: { color: t.coverAccent } });
   s.addText(String(no).padStart(2, "0"), { x: 0.55, y: 0.1, w: 6, h: 3.4, fontSize: 170, bold: true, color: t.coverAccent, transparency: 80, fontFace: t.titleFont, align: "left", valign: "top" });
   s.addShape(pptx.ShapeType.rect, { x: 0.95, y: 3.95, w: 1.8, h: 0.08, fill: { color: t.coverAccent } });
@@ -915,15 +956,25 @@ function pptxSection(pptx, s, t, W, H, sl, no) {
 }
 function pptxBullets(pptx, s, t, W, H, sl, i, total) {
   pptxHeader(pptx, s, t, W, sl.title);
-  s.addShape(pptx.ShapeType.rect, { x: 0.72, y: 2.15, w: 0.09, h: H - 3.1, fill: { color: t.accent2 } });
-  const cols = splitCols(sl.bullets);
-  const fs = bulletSize(Math.max(...cols.map(c => c.length), 1));
-  const colW = (W - 1.9) / cols.length - (cols.length > 1 ? 0.2 : 0);
+  const bullets = sl.bullets.length ? sl.bullets : [""];
+  const cols = splitCols(bullets);
+  const top = 1.98, availH = H - 2.78, colGap = 0.35;
+  const colW = (W - 1.44 - (cols.length - 1) * colGap) / cols.length;
+  const panel = mix(t.accent, t.bg, 0.9), chipText = isDark(t.accent) ? "FFFFFF" : "111111";
+  const maxN = Math.max(...cols.map(c => c.length), 1);
+  const fs = maxN <= 4 ? 17 : maxN <= 6 ? 15 : 13;
+  let idx = 0;
   cols.forEach((col, ci) => {
-    if (!col.length) return;
-    s.addText(col.map(b => ({ text: b, options: { bullet: { code: "2022", indent: 16 }, color: t.text, fontSize: fs, paraSpaceAfter: 12 } })), {
-      x: 1.0 + ci * (colW + 0.4), y: 2.12, w: colW, h: H - 3.3,
-      fontFace: t.bodyFont, valign: "top", lineSpacingMultiple: 1.18, color: t.text
+    const x = 0.72 + ci * (colW + colGap);
+    const n = col.length, gap = 0.16, rowH = Math.min(1.15, (availH - gap * (n - 1)) / n);
+    const cs = Math.min(0.52, rowH * 0.62);
+    col.forEach((b, k) => {
+      idx++;
+      const yy = top + k * (rowH + gap);
+      s.addShape(pptx.ShapeType.roundRect, { x, y: yy, w: colW, h: rowH, fill: { color: panel }, line: { width: 0 }, rectRadius: 0.07, shadow: SHADOW });
+      s.addShape(pptx.ShapeType.roundRect, { x: x + 0.18, y: yy + (rowH - cs) / 2, w: cs, h: cs, fill: { color: t.accent }, line: { width: 0 }, rectRadius: 0.1 });
+      s.addText(String(idx).padStart(2, "0"), { x: x + 0.18, y: yy + (rowH - cs) / 2, w: cs, h: cs, align: "center", valign: "middle", fontSize: 12, bold: true, color: chipText, fontFace: t.titleFont });
+      s.addText(b, { x: x + 0.18 + cs + 0.22, y: yy, w: colW - (0.18 + cs + 0.22) - 0.2, h: rowH, valign: "middle", fontSize: fs, color: t.text, fontFace: t.bodyFont, lineSpacingMultiple: 1.05 });
     });
   });
   pptxFooter(pptx, s, t, W, H, i, total);
@@ -935,7 +986,7 @@ function pptxMetrics(pptx, s, t, W, H, sl, metrics, i, total) {
   const cardBg = mix(t.accent, t.bg, 0.9), cardLine = mix(t.accent, t.bg, 0.7);
   metrics.slice(0, n).forEach((m, k) => {
     const x = 0.72 + k * (cardW + gap);
-    s.addShape(pptx.ShapeType.roundRect, { x, y, w: cardW, h: cardH, fill: { color: cardBg }, line: { color: cardLine, width: 1 }, rectRadius: 0.1 });
+    s.addShape(pptx.ShapeType.roundRect, { x, y, w: cardW, h: cardH, fill: { color: cardBg }, line: { color: cardLine, width: 1 }, rectRadius: 0.1, shadow: SHADOW });
     s.addShape(pptx.ShapeType.rect, { x: x + 0.3, y: y + 0.4, w: 0.5, h: 0.08, fill: { color: t.accent } });
     s.addText(String(m.value), { x, y: y + 0.55, w: cardW, h: 1.1, align: "center", fontSize: 40, bold: true, color: t.accent, fontFace: t.titleFont });
     s.addText(String(m.label), { x: x + 0.25, y: y + 1.7, w: cardW - 0.5, h: 0.85, align: "center", valign: "top", fontSize: 14, color: t.text, fontFace: t.bodyFont });
@@ -952,10 +1003,9 @@ function pptxQuote(pptx, s, t, W, H, sl, i, total) {
 }
 function pptxClosing(pptx, t, W, H) {
   const s = pptx.addSlide();
-  s.background = { color: t.coverBg };
+  slideBgImage(s, W, H, t, "cover");
   s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.32, h: H, fill: { color: t.coverAccent } });
-  s.addShape(pptx.ShapeType.rect, { x: W - 2.8, y: H - 2.8, w: 2.6, h: 2.6, fill: { color: t.coverAccent, transparency: 85 } });
-  s.addText("謝謝聆聽", { x: 0.9, y: 2.6, w: W - 1.8, h: 1.3, fontSize: 48, bold: true, color: t.coverText, fontFace: t.titleFont });
+  s.addText("謝謝聆聽", { x: 0.9, y: 2.6, w: W - 1.8, h: 1.3, fontSize: 48, bold: true, color: t.coverText, fontFace: t.titleFont, shadow: { type: "outer", angle: 90, blur: 10, offset: 3, color: "000000", opacity: 0.25 } });
   s.addText("THANK YOU", { x: 0.95, y: 3.95, w: 6, h: 0.5, fontSize: 15, color: t.coverText, transparency: 30, charSpacing: 4, fontFace: t.bodyFont });
   if (state.deck.title) s.addText(state.deck.title, { x: 0.95, y: H - 1.0, w: W - 2, h: 0.5, fontSize: 13, color: t.coverText, transparency: 30, fontFace: t.bodyFont });
   drawLogo(s, W, 0.6, 0.5);

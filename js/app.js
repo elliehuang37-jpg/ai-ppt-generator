@@ -299,6 +299,12 @@ function renderThemes() {
       grid.querySelectorAll(".theme-card").forEach(c => c.classList.remove("selected"));
       card.classList.add("selected");
       state.theme = card.dataset.id;
+      // Avon 品牌軟預設：若語言仍為預設繁中，切換為中英雙語
+      if (state.theme === "avon" && state.lang === "繁體中文") {
+        state.lang = "English + 繁體中文（雙語並列）";
+        const ls = $("#langSelect"); if (ls) ls.value = state.lang;
+        toast("Avon 品牌預設：已切換為中英雙語（可於步驟 2 改回）");
+      }
       saveState();
     });
   });
@@ -328,6 +334,114 @@ function collectInputs() {
   state.slideCount = +$("#slideCount").value;
   state.lang = $("#langSelect").value;
   state.tone = $("#toneSelect").value;
+}
+
+/* ---------- 匯入文案 → 可編輯簡報 ---------- */
+// 純本機解析：Markdown / 純文字 → deck（不需 API）
+function textToDeck(text) {
+  const lines = String(text).replace(/\r/g, "").split("\n");
+  let deckTitle = "", deckSub = "";
+  const slides = [];
+  let cur = null, blank = false;
+  const push = () => { if (cur) slides.push(cur); cur = null; };
+  const open = title => { push(); cur = { title: title || "", bullets: [], notes: "", layout: "bullets", chartType: "bar" }; };
+  lines.forEach(raw => {
+    const line = raw.trim();
+    if (!line) { blank = true; return; }
+    const h1 = line.match(/^#\s+(.*)/);
+    const h2 = line.match(/^#{2,6}\s+(.*)/);
+    const b = line.match(/^(?:[-*•·◦]|\d+[.)、]|[（(]\d+[)）])\s+(.*)/);
+    if (h1) {
+      if (!deckTitle && slides.length === 0 && !cur) deckTitle = h1[1];
+      else open(h1[1]);
+    } else if (h2) {
+      open(h2[1]);
+    } else if (b) {
+      if (!cur) open("");
+      cur.bullets.push(b[1]);
+    } else {
+      if (!cur) open(line);
+      else if (!cur.title) cur.title = line;
+      else if (blank && cur.bullets.length) open(line);
+      else cur.bullets.push(line);
+    }
+    blank = false;
+  });
+  push();
+  slides.forEach((s, i) => { if (!s.title) s.title = `投影片 ${i + 1}`; });
+  if (!deckTitle) deckTitle = slides.length ? slides[0].title : "未命名簡報";
+  return { title: deckTitle, subtitle: deckSub, slides };
+}
+// 讀取 .docx（用 PptxGenJS 內建的 JSZip 解壓 word/document.xml）
+async function docxToText(buf) {
+  if (typeof JSZip === "undefined") throw new Error("缺少解壓元件，請改貼純文字");
+  const zip = await JSZip.loadAsync(buf);
+  const f = zip.file("word/document.xml");
+  if (!f) throw new Error("這不是有效的 .docx");
+  let xml = await f.async("string");
+  xml = xml.replace(/<\/w:p>/g, "\n").replace(/<w:tab[^>]*\/?>/g, "\t").replace(/<[^>]+>/g, "");
+  return xml.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+function readImportFile(file) {
+  $("#importFname").textContent = file.name;
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const r = new FileReader();
+  if (ext === "docx") {
+    r.onload = async () => { try { $("#importText").value = (await docxToText(r.result)).trim(); toast("已讀取 Word 文字"); } catch (e) { toast("Word 解析失敗：" + e.message, true); } };
+    r.readAsArrayBuffer(file);
+  } else {
+    r.onload = () => { $("#importText").value = String(r.result); toast("已讀取檔案"); };
+    r.readAsText(file);
+  }
+}
+function buildImportPrompt(content) {
+  const p = PURPOSES.find(x => x.id === state.purpose) || PURPOSES[PURPOSES.length - 1];
+  return `你是專業簡報設計顧問。以下是使用者「已經寫好的文案／內容」，請忠實整理成一份結構清楚、可直接上台的簡報。務必以原文為準，不要杜撰未提供的資訊。
+
+【簡報目的】${p.name}
+【語言】${state.lang}
+【語氣】${state.tone}
+
+要求：
+1. 依內容合理分頁；每頁 3-5 個精煉重點（短句）。
+2. 適當指定 layout：section（章節分隔）、metrics（數據，重點用「數值 | 說明」）、chart（圖表，重點用「標籤 | 數值」並加 chartType）、quote（金句，bullet1 金句 bullet2 出處）、bullets（預設）。
+3. 每頁加 notes（講稿提示）。
+4. 只回傳 JSON，不要加任何解說或 markdown 標記。格式：
+{ "title":"...", "subtitle":"...", "slides":[ { "title":"...", "layout":"bullets", "chartType":"bar", "bullets":["..."], "notes":"..." } ] }
+
+【文案內容】
+"""
+${String(content).slice(0, 12000)}
+"""`;
+}
+async function importContent(mode) {
+  const text = $("#importText").value.trim();
+  if (!text) { toast("請先貼上或上傳文案", true); return; }
+  if (!state.purpose) { state.purpose = "general"; }
+  collectInputs();
+  // Avon 品牌軟預設：雙語
+  if (state.theme === "avon" && state.lang === "繁體中文") { state.lang = "English + 繁體中文（雙語並列）"; const ls = $("#langSelect"); if (ls) ls.value = state.lang; }
+
+  if (mode === "direct") {
+    const deck = textToDeck(text);
+    if (!deck.slides.length) { toast("無法解析出投影片，請檢查格式", true); return; }
+    state.deck = deck; renderOutline(); saveState(); goStep(3);
+    toast(`已轉成 ${deck.slides.length} 張投影片，可直接編輯`);
+    return;
+  }
+  const { key } = getSettings();
+  const prompt = buildImportPrompt(text);
+  if (!key) { openManual(prompt); return; }
+  loading(true, "AI 正在整理你的文案…");
+  try {
+    state.deck = parseDeck(await callLLM(prompt));
+    renderOutline(); saveState(); loading(false); goStep(3);
+    toast("已整理成簡報，可編輯");
+  } catch (err) {
+    loading(false);
+    if (err.message === "NO_KEY") { openManual(prompt); return; }
+    toast("整理失敗：" + err.message.slice(0, 120), true);
+  }
 }
 
 /* ---------- 建立 AI 提示詞 ---------- */
@@ -1220,6 +1334,12 @@ function bindEvents() {
   });
   $("#regenBtn").addEventListener("click", generateOutline);
   $$("[data-goto]").forEach(b => b.addEventListener("click", () => goStep(+b.dataset.goto)));
+
+  // 匯入文案
+  $("#importFileBtn").addEventListener("click", () => $("#importDocFile").click());
+  $("#importDocFile").addEventListener("change", e => { if (e.target.files[0]) readImportFile(e.target.files[0]); e.target.value = ""; });
+  $("#importDirectBtn").addEventListener("click", () => importContent("direct"));
+  $("#importAiBtn").addEventListener("click", () => importContent("ai"));
 
   // 匯出 / 匯入 / Markdown
   $("#exportJsonBtn").addEventListener("click", exportJson);

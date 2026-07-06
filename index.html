@@ -92,6 +92,22 @@
           </select>
         </label>
       </div>
+
+      <!-- 或：直接匯入已有文案 -->
+      <div class="or-divider"><span>或，直接匯入你的文案</span></div>
+      <div class="import-box">
+        <p class="hint">貼上文案，或上傳 <strong>.txt / .md / .docx</strong> 檔。用 Markdown（<code>#</code> 大標、<code>##</code> 每頁標題、<code>-</code> 重點）結構最準；純文字則以空行分頁。</p>
+        <textarea id="importText" rows="6" placeholder="在這裡貼上你的文案內容…（例如會議記錄、報告草稿、產品說明）"></textarea>
+        <div class="import-actions">
+          <button class="ghost-btn" id="importFileBtn">📎 上傳檔案</button>
+          <input type="file" id="importDocFile" accept=".txt,.md,.markdown,.csv,.docx" hidden />
+          <span class="import-fname" id="importFname"></span>
+          <span class="tool-sep"></span>
+          <button class="ghost-btn" id="importDirectBtn">直接轉成投影片</button>
+          <button class="primary-btn" id="importAiBtn">✨ 用 AI 整理成簡報</button>
+        </div>
+      </div>
+
       <div class="actions">
         <button class="ghost-btn" data-goto="1">← 上一步</button>
         <button class="primary-btn" id="generateOutlineBtn">✨ 產生大綱與內容</button>

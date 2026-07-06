@@ -1335,6 +1335,17 @@ function bindEvents() {
   $("#regenBtn").addEventListener("click", generateOutline);
   $$("[data-goto]").forEach(b => b.addEventListener("click", () => goStep(+b.dataset.goto)));
 
+  // 步驟 1 直接進入匯入
+  $("#haveContentBtn").addEventListener("click", () => {
+    if (!state.purpose) state.purpose = "general";
+    goStep(2);
+    setTimeout(() => {
+      const box = $(".import-box");
+      if (box) { box.scrollIntoView({ behavior: "smooth", block: "center" }); box.classList.add("flash"); setTimeout(() => box.classList.remove("flash"), 1200); }
+      $("#importText").focus();
+    }, 80);
+  });
+
   // 匯入文案
   $("#importFileBtn").addEventListener("click", () => $("#importDocFile").click());
   $("#importDocFile").addEventListener("change", e => { if (e.target.files[0]) readImportFile(e.target.files[0]); e.target.value = ""; });

@@ -257,6 +257,8 @@ textarea{resize:vertical}
 .import-box code{background:var(--card);padding:1px 5px;border-radius:5px;font-size:12px}
 .import-actions{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
 .import-fname{font-size:12.5px;color:var(--accent)}
+.import-box.flash{animation:flashBox 1.2s ease}
+@keyframes flashBox{0%,100%{box-shadow:none;border-color:var(--line)}30%{box-shadow:0 0 0 3px rgba(108,140,255,.35);border-color:var(--accent)}}
 /* 結尾頁 */
 .pv-end-title{position:absolute;inset:auto 0 auto 0;top:38%;display:block;text-align:center;font-weight:900;font-size:clamp(20px,5vw,48px)}
 .pv-end-sub{position:absolute;left:0;right:0;top:57%;text-align:center;font-size:clamp(10px,1.8vw,15px);letter-spacing:.32em;opacity:.6}

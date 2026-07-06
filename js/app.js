@@ -479,9 +479,20 @@ function showImportHints() {
 }
 function applyHintSuggestions(dataSlides) {
   harvestOutline();
-  dataSlides.forEach(d => { if (state.deck.slides[d.i]) state.deck.slides[d.i].layout = d.kind; });
+  let firstChart = -1;
+  dataSlides.forEach(d => {
+    if (state.deck.slides[d.i]) { state.deck.slides[d.i].layout = d.kind; if (firstChart < 0 && d.kind === "chart") firstChart = d.i; }
+  });
   renderOutline(); requestAnimationFrame(growAll); saveState();
-  toast("已套用建議版型");
+  toast("已套用建議版型，帶你看效果");
+  // 自動跳到預覽並定位到第一個圖表頁（沒有圖表則定位第一個數據頁）
+  const target = firstChart >= 0 ? firstChart : (dataSlides[0] ? dataSlides[0].i : -1);
+  if (target >= 0) {
+    goStep(5);
+    state.previewIdx = target + 1;   // 預覽模型：封面在最前，內容頁索引 = i + 1
+    renderPreview();
+    setTimeout(() => { const pw = $(".preview-wrap"); if (pw) pw.scrollIntoView({ behavior: "smooth", block: "center" }); }, 80);
+  }
 }
 
 /* ---------- 建立 AI 提示詞 ---------- */

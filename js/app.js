@@ -425,8 +425,7 @@ async function importContent(mode) {
   if (mode === "direct") {
     const deck = textToDeck(text);
     if (!deck.slides.length) { toast("無法解析出投影片，請檢查格式", true); return; }
-    state.deck = deck; renderOutline(); saveState(); goStep(3);
-    toast(`已轉成 ${deck.slides.length} 張投影片，可直接編輯`);
+    state.deck = deck; renderOutline(); saveState(); goStep(3); showImportHints();
     return;
   }
   const { key } = getSettings();
@@ -435,13 +434,54 @@ async function importContent(mode) {
   loading(true, "AI 正在整理你的文案…");
   try {
     state.deck = parseDeck(await callLLM(prompt));
-    renderOutline(); saveState(); loading(false); goStep(3);
-    toast("已整理成簡報，可編輯");
+    renderOutline(); saveState(); loading(false); goStep(3); showImportHints();
   } catch (err) {
     loading(false);
     if (err.message === "NO_KEY") { openManual(prompt); return; }
     toast("整理失敗：" + err.message.slice(0, 120), true);
   }
+}
+
+/* ---------- 匯入後的智慧建議 ---------- */
+function analyzeDeck(deck) {
+  const dataSlides = [], longSlides = [];
+  deck.slides.forEach((s, i) => {
+    if ((s.layout || "bullets") !== "bullets") return;
+    const bl = s.bullets || [];
+    const piped = bl.filter(b => /[|｜]/.test(b)).length;
+    const numeric = bl.filter(b => /[\d０-９]/.test(b)).length;
+    if (bl.length >= 2 && piped >= Math.ceil(bl.length * 0.6)) dataSlides.push({ i, kind: "chart" });
+    else if (bl.length >= 2 && numeric >= Math.ceil(bl.length * 0.7) && bl.every(b => b.length <= 22)) dataSlides.push({ i, kind: "metrics" });
+    if (bl.length > 7) longSlides.push({ i });
+  });
+  return { n: deck.slides.length, dataSlides, longSlides };
+}
+function showImportHints() {
+  const box = $("#importHints");
+  if (!box || !state.deck) return;
+  const a = analyzeDeck(state.deck);
+  const msgs = [`✅ 已整理成 <strong>${a.n}</strong> 張投影片，可直接編輯。`];
+  if (a.dataSlides.length) {
+    const chartN = a.dataSlides.filter(d => d.kind === "chart").map(d => d.i + 1);
+    const metricN = a.dataSlides.filter(d => d.kind === "metrics").map(d => d.i + 1);
+    if (chartN.length) msgs.push(`📊 第 ${chartN.join("、")} 頁含「標籤 | 數值」，建議改用<strong>圖表</strong>版型。`);
+    if (metricN.length) msgs.push(`🔢 第 ${metricN.join("、")} 頁多為數字，建議改用<strong>數據亮點 (KPI)</strong>版型。`);
+  }
+  if (a.longSlides.length) msgs.push(`✂️ 第 ${a.longSlides.map(d => d.i + 1).join("、")} 頁重點較多，建議精簡或拆頁（生成時會自動雙欄）。`);
+  box.innerHTML = `<div class="hints-msgs">${msgs.map(m => `<div>${m}</div>`).join("")}</div>
+    <div class="hints-actions">
+      ${a.dataSlides.length ? `<button class="ghost-btn small" id="applyHintsBtn">✨ 一鍵套用建議版型</button>` : ""}
+      <button class="ghost-btn small" id="dismissHintsBtn">知道了</button>
+    </div>`;
+  box.hidden = false;
+  if (a.dataSlides.length) $("#applyHintsBtn").addEventListener("click", () => applyHintSuggestions(a.dataSlides));
+  $("#dismissHintsBtn").addEventListener("click", () => { box.hidden = true; });
+}
+function applyHintSuggestions(dataSlides) {
+  harvestOutline();
+  dataSlides.forEach(d => { if (state.deck.slides[d.i]) state.deck.slides[d.i].layout = d.kind; });
+  renderOutline(); requestAnimationFrame(growAll); saveState();
+  toast("已套用建議版型");
 }
 
 /* ---------- 建立 AI 提示詞 ---------- */
@@ -600,6 +640,7 @@ async function regenerateSlide(card) {
 
 /* ---------- 渲染可編輯大綱 ---------- */
 function renderOutline() {
+  const hb = $("#importHints"); if (hb) hb.hidden = true;   // 預設隱藏，匯入時才顯示
   $("#deckTitle").value = state.deck.title;
   $("#deckSubtitle").value = state.deck.subtitle;
   const ed = $("#slidesEditor");

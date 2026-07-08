@@ -51,6 +51,9 @@ body{
   width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
   background:var(--line);color:var(--text);font-size:12px;font-weight:700;
 }
+.step em{font-style:normal}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+#uiLangBtn{font-weight:700;min-width:44px}
 .step.active{color:#fff;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .step.active span{background:var(--accent)}
 .step.done span{background:var(--ok)}

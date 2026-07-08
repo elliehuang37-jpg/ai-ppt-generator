@@ -17,203 +17,206 @@
     <div class="brand">
       <span class="logo">◆</span>
       <div>
-        <h1>AI 簡報生成器</h1>
-        <p class="tagline">商務 &amp; 學校報告投影片 · 自動大綱 → 設計 → 下載</p>
+        <h1 data-i18n="brand_h1">AI 簡報生成器</h1>
+        <p class="tagline" data-i18n="tagline">商務 &amp; 學校報告投影片 · 自動大綱 → 設計 → 下載</p>
       </div>
     </div>
-    <button id="settingsBtn" class="ghost-btn" title="API 設定">⚙ API 設定</button>
+    <div class="topbar-actions">
+      <button id="uiLangBtn" class="ghost-btn" title="Language / 語言">EN</button>
+      <button id="settingsBtn" class="ghost-btn" data-i18n="settings_btn" title="API">⚙ API 設定</button>
+    </div>
   </header>
 
   <!-- 步驟進度條 -->
   <nav class="stepper" id="stepper">
-    <div class="step active" data-step="1"><span>1</span>選擇目的</div>
-    <div class="step" data-step="2"><span>2</span>輸入主題</div>
-    <div class="step" data-step="3"><span>3</span>確認大綱</div>
-    <div class="step" data-step="4"><span>4</span>設計風格</div>
-    <div class="step" data-step="5"><span>5</span>生成下載</div>
+    <div class="step active" data-step="1"><span>1</span><em data-i18n="step1">選擇目的</em></div>
+    <div class="step" data-step="2"><span>2</span><em data-i18n="step2">輸入主題</em></div>
+    <div class="step" data-step="3"><span>3</span><em data-i18n="step3">確認大綱</em></div>
+    <div class="step" data-step="4"><span>4</span><em data-i18n="step4">設計風格</em></div>
+    <div class="step" data-step="5"><span>5</span><em data-i18n="step5">生成下載</em></div>
   </nav>
 
   <main class="container">
 
     <!-- ===== 步驟 1：選擇目的 ===== -->
     <section class="panel active" id="panel-1">
-      <h2>這份簡報的目的是什麼？</h2>
-      <p class="hint">不同目的會套用不同的簡報架構與用語。選一個最接近的。</p>
+      <h2 data-i18n="p1_h2">這份簡報的目的是什麼？</h2>
+      <p class="hint" data-i18n="p1_hint">不同目的會套用不同的簡報架構與用語。選一個最接近的。</p>
       <div class="card-grid" id="purposeGrid"><!-- JS 填入 --></div>
       <div class="actions">
-        <button class="ghost-btn" id="haveContentBtn">📄 我已有文案，直接匯入 →</button>
-        <button class="primary-btn" id="toStep2" disabled>下一步：輸入主題 →</button>
+        <button class="ghost-btn" id="haveContentBtn" data-i18n="have_content">📄 我已有文案，直接匯入 →</button>
+        <button class="primary-btn" id="toStep2" data-i18n="next_topic" disabled>下一步：輸入主題 →</button>
       </div>
     </section>
 
     <!-- ===== 步驟 2：輸入主題 ===== -->
     <section class="panel" id="panel-2">
-      <h2>告訴 AI 你的主題與方向</h2>
+      <h2 data-i18n="p2_h2">告訴 AI 你的主題與方向</h2>
       <div class="form-grid">
         <label class="field">
-          <span>簡報主題 <em>*</em></span>
-          <input type="text" id="topicInput" placeholder="例如：2026 馬來西亞市場進入商業計畫" />
+          <span data-i18n-html="f_topic">簡報主題 <em>*</em></span>
+          <input type="text" id="topicInput" data-i18n-ph="f_topic_ph" placeholder="例如：2026 馬來西亞市場進入商業計畫" />
         </label>
         <label class="field">
-          <span>重點方向 / 想涵蓋的內容（選填）</span>
-          <textarea id="directionInput" rows="4" placeholder="例如：市場規模、競爭分析、財務預估、3 年路線圖、風險與對策。也可貼上你的草稿或要點。"></textarea>
+          <span data-i18n="f_direction">重點方向 / 想涵蓋的內容（選填）</span>
+          <textarea id="directionInput" rows="4" data-i18n-ph="f_direction_ph" placeholder="例如：市場規模、競爭分析、財務預估、3 年路線圖、風險與對策。也可貼上你的草稿或要點。"></textarea>
         </label>
         <div class="field-row">
           <label class="field">
-            <span>目標聽眾</span>
-            <input type="text" id="audienceInput" placeholder="例如：管理層 / 老師同學 / 客戶" />
+            <span data-i18n="f_audience">目標聽眾</span>
+            <input type="text" id="audienceInput" data-i18n-ph="f_audience_ph" placeholder="例如：管理層 / 老師同學 / 客戶" />
           </label>
           <label class="field">
-            <span>投影片張數</span>
+            <span data-i18n="f_slides">投影片張數</span>
             <select id="slideCount">
-              <option value="6">精簡（約 6 張）</option>
-              <option value="10" selected>標準（約 10 張）</option>
-              <option value="14">完整（約 14 張）</option>
-              <option value="18">深入（約 18 張）</option>
+              <option value="6" data-i18n="opt_slides_6">精簡（約 6 張）</option>
+              <option value="10" selected data-i18n="opt_slides_10">標準（約 10 張）</option>
+              <option value="14" data-i18n="opt_slides_14">完整（約 14 張）</option>
+              <option value="18" data-i18n="opt_slides_18">深入（約 18 張）</option>
             </select>
           </label>
           <label class="field">
-            <span>語言</span>
+            <span data-i18n="f_lang">語言</span>
             <select id="langSelect">
-              <option value="繁體中文" selected>繁體中文</option>
-              <option value="English">English</option>
-              <option value="English + 繁體中文（雙語並列）">雙語 English + 繁中（Avon 預設）</option>
-              <option value="繁體中文（含英文專有名詞）">繁中 + 英文術語</option>
+              <option value="繁體中文" selected data-i18n="opt_lang_zh">繁體中文</option>
+              <option value="English" data-i18n="opt_lang_en">English</option>
+              <option value="English + 繁體中文（雙語並列）" data-i18n="opt_lang_bi">雙語 English + 繁中（Avon 預設）</option>
+              <option value="繁體中文（含英文專有名詞）" data-i18n="opt_lang_zhterm">繁中 + 英文術語</option>
             </select>
           </label>
         </div>
         <label class="field">
-          <span>語氣風格</span>
+          <span data-i18n="f_tone">語氣風格</span>
           <select id="toneSelect">
-            <option value="專業正式">專業正式</option>
-            <option value="清楚易懂" selected>清楚易懂</option>
-            <option value="活潑有說服力">活潑有說服力</option>
-            <option value="學術嚴謹">學術嚴謹</option>
+            <option value="專業正式" data-i18n="opt_tone_formal">專業正式</option>
+            <option value="清楚易懂" selected data-i18n="opt_tone_clear">清楚易懂</option>
+            <option value="活潑有說服力" data-i18n="opt_tone_lively">活潑有說服力</option>
+            <option value="學術嚴謹" data-i18n="opt_tone_academic">學術嚴謹</option>
           </select>
         </label>
       </div>
 
       <!-- 或：直接匯入已有文案 -->
-      <div class="or-divider"><span>或，直接匯入你的文案</span></div>
+      <div class="or-divider"><span data-i18n="or_import">或，直接匯入你的文案</span></div>
       <div class="import-box">
-        <p class="hint">貼上文案，或上傳 <strong>.txt / .md / .docx</strong> 檔。用 Markdown（<code>#</code> 大標、<code>##</code> 每頁標題、<code>-</code> 重點）結構最準；純文字則以空行分頁。</p>
-        <textarea id="importText" rows="6" placeholder="在這裡貼上你的文案內容…（例如會議記錄、報告草稿、產品說明）"></textarea>
+        <p class="hint" data-i18n-html="import_hint">貼上文案，或上傳 <strong>.txt / .md / .docx</strong> 檔。用 Markdown（<code>#</code> 大標、<code>##</code> 每頁標題、<code>-</code> 重點）結構最準；純文字則以空行分頁。</p>
+        <textarea id="importText" rows="6" data-i18n-ph="import_ph" placeholder="在這裡貼上你的文案內容…（例如會議記錄、報告草稿、產品說明）"></textarea>
         <div class="import-actions">
-          <button class="ghost-btn" id="importFileBtn">📎 上傳檔案</button>
+          <button class="ghost-btn" id="importFileBtn" data-i18n="upload_file">📎 上傳檔案</button>
           <input type="file" id="importDocFile" accept=".txt,.md,.markdown,.csv,.docx" hidden />
           <span class="import-fname" id="importFname"></span>
           <span class="tool-sep"></span>
-          <button class="ghost-btn" id="importDirectBtn">直接轉成投影片</button>
-          <button class="primary-btn" id="importAiBtn">✨ 用 AI 整理成簡報</button>
+          <button class="ghost-btn" id="importDirectBtn" data-i18n="import_direct">直接轉成投影片</button>
+          <button class="primary-btn" id="importAiBtn" data-i18n="import_ai">✨ 用 AI 整理成簡報</button>
         </div>
       </div>
 
       <div class="actions">
-        <button class="ghost-btn" data-goto="1">← 上一步</button>
-        <button class="primary-btn" id="generateOutlineBtn">✨ 產生大綱與內容</button>
+        <button class="ghost-btn" data-goto="1" data-i18n="back">← 上一步</button>
+        <button class="primary-btn" id="generateOutlineBtn" data-i18n="gen_outline">✨ 產生大綱與內容</button>
       </div>
     </section>
 
     <!-- ===== 步驟 3：確認大綱 ===== -->
     <section class="panel" id="panel-3">
-      <h2>確認 / 編輯簡報大綱</h2>
-      <p class="hint">這是 AI 產出的草稿。可直接編輯文字、增刪重點或整張投影片。滿意後再進入設計。</p>
+      <h2 data-i18n="p3_h2">確認 / 編輯簡報大綱</h2>
+      <p class="hint" data-i18n="p3_hint">這是 AI 產出的草稿。可直接編輯文字、增刪重點或整張投影片。滿意後再進入設計。</p>
       <div id="importHints" class="hints-box" hidden><!-- JS 填入智慧建議 --></div>
       <div class="outline-head">
-        <input type="text" id="deckTitle" class="deck-title-input" placeholder="簡報標題" />
-        <input type="text" id="deckSubtitle" class="deck-subtitle-input" placeholder="副標題 / 講者 / 日期" />
+        <input type="text" id="deckTitle" class="deck-title-input" data-i18n-ph="deck_title_ph" placeholder="簡報標題" />
+        <input type="text" id="deckSubtitle" class="deck-subtitle-input" data-i18n-ph="deck_sub_ph" placeholder="副標題 / 講者 / 日期" />
       </div>
       <div id="slidesEditor" class="slides-editor"><!-- JS 填入 --></div>
       <div class="outline-tools">
-        <button class="ghost-btn" id="addSlideBtn">＋ 新增一張投影片</button>
-        <button class="ghost-btn" id="regenBtn">↻ 重新生成大綱</button>
+        <button class="ghost-btn" id="addSlideBtn" data-i18n="add_slide">＋ 新增一張投影片</button>
+        <button class="ghost-btn" id="regenBtn" data-i18n="regen">↻ 重新生成大綱</button>
         <span class="tool-sep"></span>
-        <button class="ghost-btn" id="exportJsonBtn">⬇ 匯出 JSON</button>
-        <button class="ghost-btn" id="importJsonBtn">⬆ 匯入 JSON</button>
-        <button class="ghost-btn" id="copyMdBtn">📋 複製 Markdown</button>
+        <button class="ghost-btn" id="exportJsonBtn" data-i18n="export_json">⬇ 匯出 JSON</button>
+        <button class="ghost-btn" id="importJsonBtn" data-i18n="import_json">⬆ 匯入 JSON</button>
+        <button class="ghost-btn" id="copyMdBtn" data-i18n="copy_md">📋 複製 Markdown</button>
         <input type="file" id="importFile" accept="application/json,.json" hidden />
       </div>
       <div class="actions">
-        <button class="ghost-btn" data-goto="2">← 上一步</button>
-        <button class="primary-btn" id="toStep4">下一步：選擇設計風格 →</button>
+        <button class="ghost-btn" data-goto="2" data-i18n="back">← 上一步</button>
+        <button class="primary-btn" id="toStep4" data-i18n="next_design">下一步：選擇設計風格 →</button>
       </div>
     </section>
 
     <!-- ===== 步驟 4：設計風格 ===== -->
     <section class="panel" id="panel-4">
-      <h2>選擇設計風格</h2>
-      <p class="hint">每種風格有不同的配色、字級與版面。下方為即時預覽。</p>
+      <h2 data-i18n="p4_h2">選擇設計風格</h2>
+      <p class="hint" data-i18n="p4_hint">每種風格有不同的配色、字級與版面。下方為即時預覽。</p>
       <div class="theme-grid" id="themeGrid"><!-- JS 填入 --></div>
 
       <!-- 品牌客製：企業主色 + Logo -->
       <div class="brand-box">
-        <h3>企業品牌客製（選填）</h3>
-        <p class="hint">在所選風格上套用貴公司的主色與 Logo，做出專屬品牌簡報。</p>
+        <h3 data-i18n="brand_h3">企業品牌客製（選填）</h3>
+        <p class="hint" data-i18n="brand_hint">在所選風格上套用貴公司的主色與 Logo，做出專屬品牌簡報。</p>
         <div class="brand-row">
           <div class="brand-field">
-            <span>企業主色</span>
+            <span data-i18n="brand_accent">企業主色</span>
             <div class="color-line">
               <input type="color" id="accentPicker" value="#2563EB" />
               <input type="text" id="accentHex" class="hex-input" placeholder="#2563EB" maxlength="7" />
-              <button class="ghost-btn small" id="applyAccent">套用</button>
-              <button class="ghost-btn small" id="clearAccent">還原</button>
+              <button class="ghost-btn small" id="applyAccent" data-i18n="apply">套用</button>
+              <button class="ghost-btn small" id="clearAccent" data-i18n="revert">還原</button>
             </div>
             <span class="brand-note" id="accentNote">目前使用風格預設色</span>
           </div>
           <div class="brand-field">
-            <span>品牌 Logo（PNG / JPG）</span>
+            <span data-i18n="brand_logo">品牌 Logo（PNG / JPG）</span>
             <div class="color-line">
-              <button class="ghost-btn small" id="logoBtn">上傳 Logo</button>
-              <button class="ghost-btn small" id="clearLogo" hidden>移除</button>
+              <button class="ghost-btn small" id="logoBtn" data-i18n="upload_logo">上傳 Logo</button>
+              <button class="ghost-btn small" id="clearLogo" data-i18n="remove" hidden>移除</button>
               <img id="logoPreview" class="logo-preview" hidden alt="logo" />
               <input type="file" id="logoFile" accept="image/png,image/jpeg,image/svg+xml" hidden />
             </div>
-            <span class="brand-note">會自動放到封面與各頁頁首（右上）。</span>
+            <span class="brand-note" data-i18n="logo_note">會自動放到封面與各頁頁首（右上）。</span>
           </div>
           <div class="brand-field">
-            <span>封面版式</span>
+            <span data-i18n="cover_style">封面版式</span>
             <div class="seg" id="coverStyleSeg">
-              <button class="seg-btn active" data-cover="left">左置經典</button>
-              <button class="seg-btn" data-cover="center">置中對稱</button>
-              <button class="seg-btn" data-cover="full">滿版橫幅</button>
+              <button class="seg-btn active" data-cover="left" data-i18n="cover_left">左置經典</button>
+              <button class="seg-btn" data-cover="center" data-i18n="cover_center">置中對稱</button>
+              <button class="seg-btn" data-cover="full" data-i18n="cover_full">滿版橫幅</button>
             </div>
-            <span class="brand-note">選擇封面的排版樣式，於預覽第一張即時呈現。</span>
+            <span class="brand-note" data-i18n="cover_note">選擇封面的排版樣式，於預覽第一張即時呈現。</span>
           </div>
         </div>
       </div>
 
       <div class="actions">
-        <button class="ghost-btn" data-goto="3">← 上一步</button>
-        <button class="primary-btn" id="toStep5">下一步：生成投影片 →</button>
+        <button class="ghost-btn" data-goto="3" data-i18n="back">← 上一步</button>
+        <button class="primary-btn" id="toStep5" data-i18n="next_gen">下一步：生成投影片 →</button>
       </div>
     </section>
 
     <!-- ===== 步驟 5：生成下載 ===== -->
     <section class="panel" id="panel-5">
-      <h2>生成你的簡報</h2>
+      <h2 data-i18n="p5_h2">生成你的簡報</h2>
       <div class="summary-box" id="summaryBox"><!-- JS 填入 --></div>
 
       <!-- 即時投影片預覽 -->
       <div class="preview-wrap">
         <div class="preview-head">
-          <span>即時預覽（套用所選風格）</span>
+          <span data-i18n="preview_head">即時預覽（套用所選風格）</span>
           <span class="preview-counter" id="previewCounter">1 / 1</span>
         </div>
         <div class="preview-stage" id="previewStage"><!-- JS 渲染單張投影片 --></div>
         <div class="preview-nav">
-          <button class="ghost-btn" id="prevSlideBtn">← 上一張</button>
-          <button class="ghost-btn" id="nextSlideBtn">下一張 →</button>
+          <button class="ghost-btn" id="prevSlideBtn" data-i18n="prev_slide">← 上一張</button>
+          <button class="ghost-btn" id="nextSlideBtn" data-i18n="next_slide">下一張 →</button>
         </div>
       </div>
 
       <div class="generate-zone">
-        <button class="primary-btn big" id="downloadPptxBtn">⬇ 生成並下載 PPTX</button>
-        <p class="hint center">檔案在你的瀏覽器本機產生，不會上傳到任何伺服器。</p>
+        <button class="primary-btn big" id="downloadPptxBtn" data-i18n="download_btn">⬇ 生成並下載 PPTX</button>
+        <p class="hint center" data-i18n="download_note">檔案在你的瀏覽器本機產生，不會上傳到任何伺服器。</p>
       </div>
       <div class="actions">
-        <button class="ghost-btn" data-goto="4">← 上一步</button>
-        <button class="ghost-btn" data-goto="3">✏️ 回到編輯大綱</button>
-        <button class="ghost-btn" id="resetAllBtn">↺ 清除並重新開始</button>
+        <button class="ghost-btn" data-goto="4" data-i18n="back">← 上一步</button>
+        <button class="ghost-btn" data-goto="3" data-i18n="back_edit">✏️ 回到編輯大綱</button>
+        <button class="ghost-btn" id="resetAllBtn" data-i18n="reset_all">↺ 清除並重新開始</button>
       </div>
     </section>
   </main>
@@ -221,10 +224,10 @@
   <!-- ===== API 設定 Modal ===== -->
   <div class="modal-backdrop" id="settingsModal" hidden>
     <div class="modal">
-      <h3>AI 模型設定</h3>
-      <p class="hint">本工具部署在 GitHub Pages（純前端），需要你自己的 API 金鑰來呼叫 AI。金鑰只會存在你瀏覽器的 localStorage，<strong>不會上傳</strong>。</p>
+      <h3 data-i18n="settings_h3">AI 模型設定</h3>
+      <p class="hint" data-i18n-html="settings_hint">本工具部署在 GitHub Pages（純前端），需要你自己的 API 金鑰來呼叫 AI。金鑰只會存在你瀏覽器的 localStorage，<strong>不會上傳</strong>。</p>
       <label class="field">
-        <span>AI 供應商</span>
+        <span data-i18n="provider">AI 供應商</span>
         <select id="providerSelect">
           <option value="anthropic">Anthropic（Claude）</option>
           <option value="openai">OpenAI（GPT）</option>
@@ -232,22 +235,22 @@
         </select>
       </label>
       <label class="field">
-        <span>模型名稱</span>
+        <span data-i18n="model_name">模型名稱</span>
         <input type="text" id="modelInput" list="modelPresets" placeholder="claude-opus-4-8" />
         <datalist id="modelPresets"></datalist>
       </label>
       <label class="field">
-        <span>API 金鑰</span>
+        <span data-i18n="api_key">API 金鑰</span>
         <input type="password" id="apiKeyInput" placeholder="sk-..." />
       </label>
       <p class="hint" id="providerHint"></p>
       <div class="modal-actions">
-        <button class="ghost-btn" id="closeSettings">取消</button>
-        <button class="primary-btn" id="saveSettings">儲存</button>
+        <button class="ghost-btn" id="closeSettings" data-i18n="cancel">取消</button>
+        <button class="primary-btn" id="saveSettings" data-i18n="save">儲存</button>
       </div>
       <details class="no-key">
-        <summary>沒有 API 金鑰？也可以「手動模式」</summary>
-        <p class="hint">不填金鑰時，按「產生大綱」會給你一段可複製的提示詞（prompt）。把它貼到任何 AI 聊天工具，再把回傳的 JSON 貼回大綱欄即可繼續設計與下載。</p>
+        <summary data-i18n="nokey_summary">沒有 API 金鑰？也可以「手動模式」</summary>
+        <p class="hint" data-i18n="nokey_hint">不填金鑰時，按「產生大綱」會給你一段可複製的提示詞（prompt）。把它貼到任何 AI 聊天工具，再把回傳的 JSON 貼回大綱欄即可繼續設計與下載。</p>
       </details>
     </div>
   </div>
@@ -261,25 +264,26 @@
   <!-- ===== 手動貼上 JSON Modal ===== -->
   <div class="modal-backdrop" id="manualModal" hidden>
     <div class="modal">
-      <h3>手動模式</h3>
-      <p class="hint">1. 複製下方提示詞貼到 AI 聊天工具：</p>
+      <h3 data-i18n="manual_h3">手動模式</h3>
+      <p class="hint" data-i18n="manual_hint1">1. 複製下方提示詞貼到 AI 聊天工具：</p>
       <textarea id="manualPrompt" rows="6" readonly class="mono"></textarea>
-      <button class="ghost-btn" id="copyPromptBtn">📋 複製提示詞</button>
-      <p class="hint">2. 把 AI 回傳的 JSON 貼到這裡：</p>
+      <button class="ghost-btn" id="copyPromptBtn" data-i18n="copy_prompt">📋 複製提示詞</button>
+      <p class="hint" data-i18n="manual_hint2">2. 把 AI 回傳的 JSON 貼到這裡：</p>
       <textarea id="manualJson" rows="6" placeholder='{ "title": "...", "slides": [...] }' class="mono"></textarea>
       <div class="modal-actions">
-        <button class="ghost-btn" id="closeManual">取消</button>
-        <button class="primary-btn" id="applyManual">套用大綱</button>
+        <button class="ghost-btn" id="closeManual" data-i18n="cancel">取消</button>
+        <button class="primary-btn" id="applyManual" data-i18n="apply_outline">套用大綱</button>
       </div>
     </div>
   </div>
 
   <footer class="footer">
-    <span>純前端 · 可部署於 GitHub Pages · PPTX 由 <a href="https://gitbrent.github.io/PptxGenJS/" target="_blank" rel="noopener">PptxGenJS</a> 生成</span>
+    <span data-i18n-html="footer">純前端 · 可部署於 GitHub Pages · PPTX 由 <a href="https://gitbrent.github.io/PptxGenJS/" target="_blank" rel="noopener">PptxGenJS</a> 生成</span>
   </footer>
 
   <div id="toast" class="toast" hidden></div>
 
+  <script src="js/i18n.js"></script>
   <script src="js/avon-asset.js"></script>
   <script src="js/themes.js"></script>
   <script src="js/app.js"></script>

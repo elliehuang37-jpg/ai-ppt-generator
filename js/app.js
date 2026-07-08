@@ -28,6 +28,12 @@ const PROVIDER_HINTS = {
   openai: "在 platform.openai.com 取得金鑰。常用模型：gpt-4o、gpt-4o-mini。",
   gemini: "在 aistudio.google.com 取得金鑰。常用模型：gemini-1.5-flash、gemini-1.5-pro。"
 };
+const PROVIDER_HINTS_EN = {
+  anthropic: "Get a key at console.anthropic.com. Direct browser access is enabled via anthropic-dangerous-direct-browser-access.",
+  openai: "Get a key at platform.openai.com. Common models: gpt-4o, gpt-4o-mini.",
+  gemini: "Get a key at aistudio.google.com. Common models: gemini-1.5-flash, gemini-1.5-pro."
+};
+function providerHint(p) { return (UI_LANG === "en" ? PROVIDER_HINTS_EN : PROVIDER_HINTS)[p]; }
 
 const TWO_COL_THRESHOLD = 6;   // 重點超過此數 → 自動雙欄
 const STORE_KEY = "ppt_workstate";
@@ -44,9 +50,9 @@ const state = {
   previewIdx: 0
 };
 const COVER_STYLES = [
-  { id: "left", name: "左置經典" },
-  { id: "center", name: "置中對稱" },
-  { id: "full", name: "滿版橫幅" }
+  { id: "left", name: "左置經典", nameEn: "Left classic" },
+  { id: "center", name: "置中對稱", nameEn: "Centered" },
+  { id: "full", name: "滿版橫幅", nameEn: "Full banner" }
 ];
 
 /* ---------- 工具 ---------- */
@@ -54,12 +60,12 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 function toast(msg, isErr = false) {
   const t = $("#toast");
-  t.textContent = msg; t.hidden = false;
+  t.textContent = tMsg(msg); t.hidden = false;
   t.classList.toggle("err", isErr);
   clearTimeout(t._t); t._t = setTimeout(() => (t.hidden = true), 3200);
 }
 function loading(show, text = "AI 思考中…") {
-  $("#loadingText").textContent = text;
+  $("#loadingText").textContent = tMsg(text);
   $("#loadingOverlay").hidden = !show;
 }
 // localStorage 安全存取（隱私模式/停用時不會讓程式壞掉）
@@ -76,17 +82,17 @@ function escapeHtml(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"
 
 /* ---------- 版型與配色工具（專業商務排版用） ---------- */
 const LAYOUTS = [
-  { id: "bullets", name: "條列重點", hint: "" },
-  { id: "section", name: "章節分隔", hint: "此頁作為章節封面：標題即章節名，第一個重點作為簡短說明。" },
-  { id: "metrics", name: "數據亮點 (KPI)", hint: "每個重點請用「數值 | 說明」，例如：180% | 三年 ROI。" },
-  { id: "chart", name: "圖表 (長條/圓餅)", hint: "每列「標籤 | 數值」；多系列用「標籤 | 值1 | 值2」，並可加一列「#系列 | 名稱1 | 名稱2」定義圖例。" },
-  { id: "quote", name: "金句引言", hint: "第一個重點 = 金句，第二個重點 = 出處/署名。" }
+  { id: "bullets", name: "條列重點", nameEn: "Bullets", hint: "", hintEn: "" },
+  { id: "section", name: "章節分隔", nameEn: "Section divider", hint: "此頁作為章節封面：標題即章節名，第一個重點作為簡短說明。", hintEn: "Section cover: title = section name, first bullet = short description." },
+  { id: "metrics", name: "數據亮點 (KPI)", nameEn: "KPI metrics", hint: "每個重點請用「數值 | 說明」，例如：180% | 三年 ROI。", hintEn: "Each bullet as “value | label”, e.g. 180% | 3-yr ROI." },
+  { id: "chart", name: "圖表 (長條/圓餅)", nameEn: "Chart (bar/pie)", hint: "每列「標籤 | 數值」；多系列用「標籤 | 值1 | 值2」，並可加一列「#系列 | 名稱1 | 名稱2」定義圖例。", hintEn: "Each row “label | value”; multi-series “label | v1 | v2”, and a “#series | name1 | name2” row for the legend." },
+  { id: "quote", name: "金句引言", nameEn: "Quote", hint: "第一個重點 = 金句，第二個重點 = 出處/署名。", hintEn: "First bullet = quote, second = attribution." }
 ];
 const LAYOUT_IDS = LAYOUTS.map(l => l.id);
 const CHART_TYPES = [
-  { id: "bar", name: "長條圖" },
-  { id: "pie", name: "圓餅圖" },
-  { id: "line", name: "折線圖" }
+  { id: "bar", name: "長條圖", nameEn: "Bar" },
+  { id: "pie", name: "圓餅圖", nameEn: "Pie" },
+  { id: "line", name: "折線圖", nameEn: "Line" }
 ];
 const CHART_IDS = CHART_TYPES.map(c => c.id);
 
@@ -262,11 +268,12 @@ function restoreState() {
 function renderPurposes() {
   const grid = $("#purposeGrid");
   grid.innerHTML = PURPOSES.map(p => `
-    <button class="purpose-card" data-id="${p.id}">
+    <button class="purpose-card ${p.id === state.purpose ? "selected" : ""}" data-id="${p.id}">
       <div class="ico">${p.icon}</div>
-      <h3>${p.name}</h3>
-      <p>${p.desc}</p>
+      <h3>${tLang(p.name, p.nameEn)}</h3>
+      <p>${tLang(p.desc, p.descEn)}</p>
     </button>`).join("");
+  if (state.purpose) $("#toStep2").disabled = false;
   grid.querySelectorAll(".purpose-card").forEach(card => {
     card.addEventListener("click", () => {
       grid.querySelectorAll(".purpose-card").forEach(c => c.classList.remove("selected"));
@@ -292,7 +299,7 @@ function renderThemes() {
         </div>
         <div class="tp-bar" style="background:#${t.accent}"></div>
       </div>
-      <div class="tc-name">${t.name}<small>${t.subtitle}</small></div>
+      <div class="tc-name">${tLang(t.name, t.nameEn)}<small>${tLang(t.subtitle, t.subtitleEn)}</small></div>
     </div>`).join("");
   grid.querySelectorAll(".theme-card").forEach(card => {
     card.addEventListener("click", () => {
@@ -460,18 +467,19 @@ function showImportHints() {
   const box = $("#importHints");
   if (!box || !state.deck) return;
   const a = analyzeDeck(state.deck);
-  const msgs = [`✅ 已整理成 <strong>${a.n}</strong> 張投影片，可直接編輯。`];
+  const sep = UI_LANG === "en" ? ", " : "、";
+  const msgs = [t("hint_n", a.n)];
   if (a.dataSlides.length) {
     const chartN = a.dataSlides.filter(d => d.kind === "chart").map(d => d.i + 1);
     const metricN = a.dataSlides.filter(d => d.kind === "metrics").map(d => d.i + 1);
-    if (chartN.length) msgs.push(`📊 第 ${chartN.join("、")} 頁含「標籤 | 數值」，建議改用<strong>圖表</strong>版型。`);
-    if (metricN.length) msgs.push(`🔢 第 ${metricN.join("、")} 頁多為數字，建議改用<strong>數據亮點 (KPI)</strong>版型。`);
+    if (chartN.length) msgs.push(t("hint_chart", chartN.join(sep)));
+    if (metricN.length) msgs.push(t("hint_metrics", metricN.join(sep)));
   }
-  if (a.longSlides.length) msgs.push(`✂️ 第 ${a.longSlides.map(d => d.i + 1).join("、")} 頁重點較多，建議精簡或拆頁（生成時會自動雙欄）。`);
+  if (a.longSlides.length) msgs.push(t("hint_long", a.longSlides.map(d => d.i + 1).join(sep)));
   box.innerHTML = `<div class="hints-msgs">${msgs.map(m => `<div>${m}</div>`).join("")}</div>
     <div class="hints-actions">
-      ${a.dataSlides.length ? `<button class="ghost-btn small" id="applyHintsBtn">✨ 一鍵套用建議版型</button>` : ""}
-      <button class="ghost-btn small" id="dismissHintsBtn">知道了</button>
+      ${a.dataSlides.length ? `<button class="ghost-btn small" id="applyHintsBtn">${t("apply_hints_btn")}</button>` : ""}
+      <button class="ghost-btn small" id="dismissHintsBtn">${t("dismiss_hints")}</button>
     </div>`;
   box.hidden = false;
   if (a.dataSlides.length) $("#applyHintsBtn").addEventListener("click", () => applyHintSuggestions(a.dataSlides));
@@ -493,6 +501,66 @@ function applyHintSuggestions(dataSlides) {
     renderPreview();
     setTimeout(() => { const pw = $(".preview-wrap"); if (pw) pw.scrollIntoView({ behavior: "smooth", block: "center" }); }, 80);
   }
+}
+
+/* ---------- 內建本機大綱生成器（無金鑰也能生成） ---------- */
+// 依「段落名稱」產生範本重點；T=主題、K=關鍵詞陣列
+const SECTION_TPLS = [
+  { re: /執行摘要|重點摘要|摘要|吸睛開場|封面/, mk: (T, K) => [`主題：${T}`, K.length ? `聚焦重點：${K.slice(0, 3).join("、")}` : "背景、方案與效益一頁掌握", "關鍵結論與建議行動"] },
+  { re: /市場|背景|現況|動機/, mk: (T, K) => [`${T} 的背景與現況`, "市場規模與成長趨勢", K[0] ? `與「${K[0]}」相關的驅動因素` : "主要驅動因素與外部環境", "目前面臨的核心問題"] },
+  { re: /機會|挑戰|痛點/, mk: (T, K) => ["最大的機會點與切入時機", K[1] ? `機會領域：${K[1]}` : "未被滿足的需求", "主要挑戰與限制", "為什麼是現在（Why now）"] },
+  { re: /策略|主軸|建議方案|解決方案|核心概念/, mk: (T, K) => (K.length ? K.slice(0, 5).map(k => `策略重點：${k}`) : ["策略主軸一：聚焦核心客群", "策略主軸二：強化差異化", "策略主軸三：擴大通路布局"]) },
+  { re: /方案比較|可選方案/, mk: () => ["方案 A：優點與成本", "方案 B：優點與成本", "方案 C：維持現狀的風險", "建議採用方案與理由"] },
+  { re: /行動|實施|計畫|步驟|方法|練習/, mk: (T, K) => ["第一階段：規劃與資源盤點", K[0] ? `第二階段：啟動「${K[0]}」` : "第二階段：試點執行", "第三階段：全面推展與優化", "所需資源與分工"] },
+  { re: /財務|投資|效益|ROI|數據|成果|指標|達成/, mk: () => ["投入成本 | （請填金額）", "預期營收 | （請填金額）", "投資回收期 | （請填月數）", "關鍵 KPI | （請填指標）"], layout: "metrics" },
+  { re: /時程|路線圖|里程碑|議程/, mk: () => ["Q1：籌備與資源到位", "Q2：試點與修正", "Q3：擴大執行", "Q4：檢視成效與下年度規劃"] },
+  { re: /風險|對策|問題/, mk: () => ["風險一：市場變化 → 對策：滾動式調整", "風險二：資源不足 → 對策：分階段投入", "風險三：執行落差 → 對策：週期檢核"] },
+  { re: /案例|見證|示範/, mk: (T) => [`成功案例：與 ${T} 情境相近的實例`, "做法重點與可複製之處", "成果數字與客戶回饋"] },
+  { re: /價格|方案與價格|需求|the ask/i, mk: () => ["建議方案與內容", "投資金額與期程", "本次需要的決策與支持"] },
+  { re: /結論|下一步|總結|回顧|心得|反思/, mk: (T, K) => [`重申核心：${T}`, K.length ? `三個帶走的重點：${K.slice(0, 3).join("、")}` : "三個帶走的重點", "下一步行動與時間點"] },
+  { re: /參考|文獻|資源/, mk: () => ["資料來源一（請補充）", "資料來源二（請補充）", "延伸閱讀與工具"] }
+];
+function localOutline() {
+  const p = PURPOSES.find(x => x.id === state.purpose) || PURPOSES[PURPOSES.length - 1];
+  const T = state.topic;
+  const K = state.direction.split(/[、,，;；\/\n]+/).map(s => s.trim()).filter(s => s && s.length <= 30);
+  // 取目的架構的段落（去掉封面類），依張數裁切
+  let secs = p.structure.split(/、/).map(s => s.trim()).filter(s => s && !/^標題頁|^封面/.test(s));
+  if (p.id === "general") secs = ["開場與背景", "現況分析", "重點內容", "案例與說明", "效益與價值", "結論與下一步"];
+  const n = Math.min(Math.max(state.slideCount, 4), secs.length + 4);
+  if (secs.length > n) {
+    // 保留頭尾，均勻抽掉中間段
+    while (secs.length > n) secs.splice(Math.ceil(secs.length / 2), 1);
+  }
+  const slides = secs.map(sec => {
+    const tpl = SECTION_TPLS.find(x => x.re.test(sec));
+    const bullets = tpl ? tpl.mk(T, K) : [`${sec}重點一（請補充）`, `${sec}重點二（請補充）`, `${sec}重點三（請補充）`];
+    return {
+      title: sec, bullets,
+      notes: `此頁說明「${sec}」：先講結論，再補一個例子或數字。`,
+      layout: (tpl && tpl.layout) || "bullets", chartType: "bar"
+    };
+  });
+  // 關鍵詞若很多，補一頁「重點方向總覽」
+  if (K.length >= 4 && slides.length < state.slideCount + 2) {
+    slides.splice(1, 0, { title: "重點方向總覽", bullets: K.slice(0, 6), notes: "快速帶過本次涵蓋的面向。", layout: "bullets", chartType: "bar" });
+  }
+  return { title: T, subtitle: state.audience ? `對象：${state.audience}` : "（副標題／講者／日期）", slides };
+}
+// 本機生成後的提示（提供升級到 AI 的路徑）
+function showLocalGenNotice(prompt) {
+  const box = $("#importHints");
+  if (!box) return;
+  box.innerHTML = `<div class="hints-msgs"><div>${t("local_gen_msg")}</div></div>
+    <div class="hints-actions">
+      <button class="ghost-btn small" id="lgSettingsBtn">${t("local_gen_key")}</button>
+      <button class="ghost-btn small" id="lgManualBtn">${t("local_gen_manual")}</button>
+      <button class="ghost-btn small" id="dismissHintsBtn">${t("dismiss_hints")}</button>
+    </div>`;
+  box.hidden = false;
+  $("#lgSettingsBtn").addEventListener("click", openSettings);
+  $("#lgManualBtn").addEventListener("click", () => openManual(prompt));
+  $("#dismissHintsBtn").addEventListener("click", () => { box.hidden = true; });
 }
 
 /* ---------- 建立 AI 提示詞 ---------- */
@@ -602,7 +670,15 @@ async function generateOutline() {
   if (!state.topic) { toast("請先輸入簡報主題", true); return; }
   const prompt = buildPrompt();
   const { key } = getSettings();
-  if (!key) { openManual(prompt); return; }
+
+  // 沒有金鑰 → 用內建生成器直接產出大綱（不再卡在手動模式）
+  if (!key) {
+    state.deck = localOutline();
+    renderOutline(); saveState(); goStep(3);
+    showLocalGenNotice(prompt);
+    toast("已用內建範本生成大綱，可直接編輯");
+    return;
+  }
 
   loading(true, "AI 正在撰寫大綱與內容…");
   try {
@@ -614,9 +690,12 @@ async function generateOutline() {
     goStep(3);
   } catch (err) {
     loading(false);
-    if (err.message === "NO_KEY") { openManual(prompt); return; }
     console.error(err);
-    toast("產生失敗：" + err.message.slice(0, 120), true);
+    // AI 呼叫失敗 → 退回內建生成器，不讓使用者卡住
+    state.deck = localOutline();
+    renderOutline(); saveState(); goStep(3);
+    showLocalGenNotice(prompt);
+    toast("AI 連線失敗，已改用內建範本生成：" + err.message.slice(0, 80), true);
   }
 }
 
@@ -667,23 +746,23 @@ function slideCardEl(sl, i) {
       <div class="num">${i + 1}</div>
       <input class="sc-title" value="${escapeHtml(sl.title)}" />
       <div class="sc-ctrls">
-        <button class="sc-up" title="上移">▲</button>
-        <button class="sc-down" title="下移">▼</button>
-        <button class="sc-regen" title="用 AI 重寫這張">↻</button>
-        <button class="sc-del" title="刪除這張">✕</button>
+        <button class="sc-up" title="${t("sc_up")}">▲</button>
+        <button class="sc-down" title="${t("sc_down")}">▼</button>
+        <button class="sc-regen" title="${t("sc_regen")}">↻</button>
+        <button class="sc-del" title="${t("sc_del")}">✕</button>
       </div>
     </div>
     <div class="sc-layout-row">
-      <label>版型</label>
-      <select class="sc-layout">${LAYOUTS.map(l => `<option value="${l.id}" ${l.id === (sl.layout || "bullets") ? "selected" : ""}>${l.name}</option>`).join("")}</select>
-      <select class="sc-charttype" hidden>${CHART_TYPES.map(c => `<option value="${c.id}" ${c.id === (sl.chartType || "bar") ? "selected" : ""}>${c.name}</option>`).join("")}</select>
+      <label>${t("sc_layout")}</label>
+      <select class="sc-layout">${LAYOUTS.map(l => `<option value="${l.id}" ${l.id === (sl.layout || "bullets") ? "selected" : ""}>${tLang(l.name, l.nameEn)}</option>`).join("")}</select>
+      <select class="sc-charttype" hidden>${CHART_TYPES.map(c => `<option value="${c.id}" ${c.id === (sl.chartType || "bar") ? "selected" : ""}>${tLang(c.name, c.nameEn)}</option>`).join("")}</select>
       <span class="sc-hint"></span>
     </div>
     <div class="bullets"></div>
-    <button class="add-bullet">＋ 新增重點</button>
+    <button class="add-bullet">${t("add_point")}</button>
     <div class="sc-notes">
-      <button class="notes-toggle">📝 講稿備註${sl.notes ? "（已有內容）" : ""}</button>
-      <textarea class="notes-area" placeholder="口頭講稿提示…" hidden>${escapeHtml(sl.notes)}</textarea>
+      <button class="notes-toggle">${t("notes_toggle")}${sl.notes ? t("notes_has") : ""}</button>
+      <textarea class="notes-area" placeholder="${t("notes_ph")}" hidden>${escapeHtml(sl.notes)}</textarea>
     </div>`;
   const bl = card.querySelector(".bullets");
   (sl.bullets.length ? sl.bullets : [""]).forEach(b => bl.appendChild(bulletRow(b)));
@@ -701,7 +780,8 @@ function slideCardEl(sl, i) {
   const chartSel = card.querySelector(".sc-charttype");
   const hint = card.querySelector(".sc-hint");
   const updateHint = () => {
-    hint.textContent = (LAYOUTS.find(l => l.id === lay.value) || {}).hint || "";
+    const L = LAYOUTS.find(l => l.id === lay.value) || {};
+    hint.textContent = tLang(L.hint || "", L.hintEn || "");
     chartSel.hidden = lay.value !== "chart";
   };
   updateHint();
@@ -714,7 +794,7 @@ function bulletRow(text) {
   row.className = "bullet-row";
   row.innerHTML = `<span class="dot">●</span>
     <textarea rows="1">${escapeHtml(text)}</textarea>
-    <button class="b-del" title="刪除">✕</button>`;
+    <button class="b-del" title="${t("b_del")}">✕</button>`;
   const ta = row.querySelector("textarea");
   autoGrow(ta); ta.addEventListener("input", () => autoGrow(ta));
   row.querySelector(".b-del").addEventListener("click", () => { row.remove(); saveState(); });
@@ -751,13 +831,13 @@ function harvestOutline() {
 function buildSummary() {
   harvestOutline();
   const p = PURPOSES.find(x => x.id === state.purpose);
-  const t = activeTheme();
+  const th = activeTheme();
   $("#summaryBox").innerHTML = `
-    <div class="row"><span class="k">簡報目的</span><span class="v">${p ? p.name : "—"}</span></div>
-    <div class="row"><span class="k">主題</span><span class="v">${escapeHtml(state.deck.title)}</span></div>
-    <div class="row"><span class="k">設計風格</span><span class="v">${t.name}（${t.subtitle}）</span></div>
-    <div class="row"><span class="k">投影片數</span><span class="v">封面 + ${state.deck.slides.length} 張內容 + 結尾頁</span></div>
-    <div class="row"><span class="k">語言 / 語氣</span><span class="v">${state.lang} · ${state.tone}</span></div>`;
+    <div class="row"><span class="k">${t("sum_purpose")}</span><span class="v">${p ? tLang(p.name, p.nameEn) : "—"}</span></div>
+    <div class="row"><span class="k">${t("sum_topic")}</span><span class="v">${escapeHtml(state.deck.title)}</span></div>
+    <div class="row"><span class="k">${t("sum_style")}</span><span class="v">${tLang(th.name, th.nameEn)}（${tLang(th.subtitle, th.subtitleEn)}）</span></div>
+    <div class="row"><span class="k">${t("sum_count")}</span><span class="v">${t("sum_count_val", state.deck.slides.length)}</span></div>
+    <div class="row"><span class="k">${t("sum_lang")}</span><span class="v">${state.lang} · ${state.tone}</span></div>`;
 }
 
 /* ---------- 即時預覽 ---------- */
@@ -1312,7 +1392,7 @@ function openSettings() {
   fillModelDatalist(s.provider);
   $("#modelInput").value = s.model || DEFAULT_MODELS[s.provider];
   $("#apiKeyInput").value = s.key;
-  $("#providerHint").textContent = PROVIDER_HINTS[s.provider];
+  $("#providerHint").textContent = providerHint(s.provider);
   $("#settingsModal").hidden = false;
 }
 
@@ -1321,9 +1401,9 @@ function applyBrandUI() {
   if (state.customAccent) {
     const h = "#" + hx(state.customAccent);
     $("#accentPicker").value = h; $("#accentHex").value = h;
-    $("#accentNote").textContent = "已套用企業主色 " + h;
+    $("#accentNote").textContent = tLang("已套用企業主色 " + h, "Brand color applied " + h);
   } else {
-    $("#accentNote").textContent = "目前使用風格預設色";
+    $("#accentNote").textContent = tLang("目前使用風格預設色", "Using the style's default color");
   }
   const hasLogo = state.logo && state.logo.data;
   $("#logoPreview").hidden = !hasLogo;
@@ -1358,7 +1438,7 @@ function handleLogoFile(file) {
 
 /* ---------- 全部重設 ---------- */
 function resetAll() {
-  if (!confirm("確定要清除目前的主題、大綱與進度，重新開始嗎？（API 設定會保留）")) return;
+  if (!confirm(t("reset_confirm"))) return;
   clearState();
   Object.assign(state, { purpose: null, topic: "", direction: "", audience: "", slideCount: 10, lang: "繁體中文", tone: "清楚易懂", deck: null, theme: THEMES[0].id, customAccent: null, logo: null, coverStyle: "left", step: 1, previewIdx: 0 });
   ["topicInput", "directionInput", "audienceInput"].forEach(id => $("#" + id).value = "");
@@ -1371,9 +1451,29 @@ function resetAll() {
 }
 
 /* ---------- 事件綁定 ---------- */
+/* ---------- 介面語言切換 ---------- */
+function applyUiLang() {
+  document.documentElement.lang = UI_LANG === "en" ? "en" : "zh-Hant";
+  document.title = t("doc_title");
+  $$("[data-i18n]").forEach(el => { el.textContent = t(el.getAttribute("data-i18n")); });
+  $$("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.getAttribute("data-i18n-html")); });
+  $$("[data-i18n-ph]").forEach(el => { el.setAttribute("placeholder", t(el.getAttribute("data-i18n-ph"))); });
+  const b = $("#uiLangBtn"); if (b) b.textContent = UI_LANG === "en" ? "中文" : "EN";
+  renderPurposes(); renderThemes(); applyBrandUI();
+  if (state.deck && $$("#slidesEditor .slide-card").length) { harvestOutline(); renderOutline(); requestAnimationFrame(growAll); }
+  if ($("#providerHint")) $("#providerHint").textContent = providerHint(getSettings().provider);
+  if (state.deck && state.step === 5) { buildSummary(); renderPreview(); }
+}
+
 function bindEvents() {
   renderPurposes();
   renderThemes();
+
+  $("#uiLangBtn").addEventListener("click", () => {
+    UI_LANG = UI_LANG === "en" ? "zh" : "en";
+    try { localStorage.setItem("ppt_uilang", UI_LANG); } catch (e) {}
+    applyUiLang();
+  });
 
   $("#toStep2").addEventListener("click", () => goStep(2));
   $("#generateOutlineBtn").addEventListener("click", generateOutline);
@@ -1381,7 +1481,7 @@ function bindEvents() {
   $("#toStep5").addEventListener("click", () => goStep(5));
   $("#downloadPptxBtn").addEventListener("click", generatePptx);
   $("#addSlideBtn").addEventListener("click", () => {
-    $("#slidesEditor").appendChild(slideCardEl({ title: "新投影片", bullets: ["重點"], notes: "", layout: "bullets", chartType: "bar" }, $$("#slidesEditor .slide-card").length));
+    $("#slidesEditor").appendChild(slideCardEl({ title: t("new_slide"), bullets: [t("new_point")], notes: "", layout: "bullets", chartType: "bar" }, $$("#slidesEditor .slide-card").length));
     renumber(); requestAnimationFrame(growAll); collectAll();
   });
   $("#regenBtn").addEventListener("click", generateOutline);
@@ -1437,7 +1537,7 @@ function bindEvents() {
   $("#providerSelect").addEventListener("change", e => {
     fillModelDatalist(e.target.value);
     $("#modelInput").value = DEFAULT_MODELS[e.target.value];
-    $("#providerHint").textContent = PROVIDER_HINTS[e.target.value];
+    $("#providerHint").textContent = providerHint(e.target.value);
   });
   $("#saveSettings").addEventListener("click", () => {
     const ok = lsSet("ppt_provider", $("#providerSelect").value)
@@ -1471,6 +1571,8 @@ function bindEvents() {
 
   // 還原上次進度
   restoreState();
+  // 套用介面語言（放最後，確保所有動態內容都本地化）
+  applyUiLang();
 }
 
 document.addEventListener("DOMContentLoaded", bindEvents);
